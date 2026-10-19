@@ -14,6 +14,7 @@ def test_control_loss_is_observed_after_grant_and_release_is_sent():
             async def write(self, request):
                 self.writes.append(request.WhichOneof('request_type'))
                 if self.writes[-1] == 'control_request':
+                    assert request.control_request.priority == p.ControlRequest.DEFAULT
                     self.queue.put_nowait(p.BehaviorControlResponse(control_granted_response=p.ControlGrantedResponse()))
             def __aiter__(self):
                 return self

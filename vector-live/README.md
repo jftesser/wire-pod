@@ -30,20 +30,57 @@ wheel movement, control loss, or disabling head gestures. Optional expression
 failures are visible in admin and do not tear down otherwise working voice.
 Stop cancels head actions before releasing SDK control; face images expire.
 
-**Roaming during conversation is an intended next capability.** This coordinator
-currently owns face/head only. A navigation policy can issue bounded wheel
-commands under the same SDK control while native capture continues, with
-collision/cliff/pickup checks, a travel boundary, emergency stop, and motor-noise
-AEC tests. Releasing SDK control to ordinary autonomy is not a proven way to
-combine roaming with this speaker path. No wheel/lift commands are implemented.
+## Natural behavior and requested movement
+
+The admin's **Keep ordinary Vector behavior during Live** switch takes effect on
+the next Start. With it enabled, Live never takes a session-wide SDK control
+lease or paints automatic eyes. Vector's ordinary behavior owns the face, head,
+arms and wheels between requested gestures. Native microphone capture and
+external speaker streaming do not require that lease: a five-second hardware
+probe delivered48real audio groups without gaps, while muted speaker playback
+completed, with no behavior-control request or paid session.
+
+Requested expressions temporarily acquire SDK control, perform the action, then
+release it. Motor permission is separate: **Off / Arms only / Arms + short rolls
+and turns**. The web picker adds arms up/down, wave, forward5cm, backward2.5cm,
+left/right30° and Stop Live-requested action. The voice backend's `perform_motion`
+accepts lift height0–100percent, wave, roll-50..100mm and turns±5..90°. Rolls run
+at35mm/s, turns at0.6rad/s, and every SDK action has zero retries and a finite
+deadline. No automatic motor embellishments or chained navigation are provided.
+
+Wheel requests require off-charger, low arms, fresh state, no pickup/falling/cliff
+or carrying-object flags, and adequate forward range for forward rolls/turns.
+Reverse is capped at50mm because there is no rear range sensor. While moving,
+the supervisor checks every50ms and cancels/stops on unsafe or stale state,
+permission changes or shutdown. SDK completion alone is insufficient: lift
+height, traveled distance or heading must also match fresh state. SDK DEFAULT
+priority preserves native stop-on-cliff; the previous OVERRIDE_BEHAVIORS priority
+selects a firmware behavior that disables it. The installed SDKDefault config
+was read and verified. No firmware/binary changes are needed for this feature.
+
+Ordinary roaming uses Vector's own policies and is not bounded by the short SDK
+command limits. Use a clear level floor for movement tests. Stop Live-requested
+action cancels the Live action; natural behavior resumes after its lease is
+released. Stop conversation closes mic/cloud and restores ordinary behavior.
+Spoken stop requests bypass the tool execution queue. Motor-noise AEC and the
+combined spoken-action/ordinary-autonomy experience require an attended trial.
+
+The owner confirmed the separate arm wave and50mmroll. Spoken `perform_motion`
+then completed arm and wheel actions during a Live conversation; the owner
+reported that lower volume worked much better. One spoken trial later closed
+with a generic microphone-helper/queue error. A90secondoffline probe and a quiet
+93secondLive connection with an arm wave subsequently passed. The quiet check
+had no audible model playback, so this is not proof that the intermittent
+spoken-session fault is fixed. Precise stall/overflow and queue/send timing
+metadata are now available for diagnosis; bounded cleanup remains in place.
 
 ## Configurable gestures and legacy expressions
 
 The Live admin saves **nod depth2–20°**, **automatic nod interval4–30seconds**,
 and a separate legacy-expression switch. Nod depth is an excursion from the
 observed head angle and is clipped to physical head travel. Head mode permits
-head movement; eyes mode keeps native animations face-only. Wheels and lift
-remain disabled. `Try expression` works only during a ready continuous session;
+head movement; eyes mode keeps native animations face-only. The separate motor
+permission controls arms and wheel actions. `Try expression` works only during a ready continuous session;
 it never starts paid voice. Actual completion, cancellation or refusal appears
 in the admin status.
 

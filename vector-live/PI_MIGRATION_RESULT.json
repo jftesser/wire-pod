@@ -1,6 +1,6 @@
 {
-  "updated_utc": "2026-10-19T22:39:58.216635+00:00",
-  "state": "Pi deployment and saved continuous volume controls active",
+  "updated_utc": "2026-10-19T23:20:39.603863+00:00",
+  "state": "Pi continuous voice with natural behavior and bounded requested motor actions",
   "backend_host": "Pi",
   "mac_audio_or_cloud_dependency": false,
   "pi_controller_enabled": true,
@@ -304,5 +304,80 @@
     },
     "backup": "20261019-before-voice-choice",
     "speaker_quality_check": "Pending attended conversation"
+  },
+  "natural_behavior_and_motion": {
+    "deployed": true,
+    "settings": {
+      "autonomy": true,
+      "motion": "full"
+    },
+    "control_priority": "DEFAULT (20)",
+    "installed_cliff_detection_verified_enabled": true,
+    "firmware_changed": false,
+    "offline_suite": {
+      "Mac": 116,
+      "Pi": 116
+    },
+    "additional_wrapped_heading_test": {
+      "Mac": "passed",
+      "Pi": "passed"
+    },
+    "audio_without_control": {
+      "native_groups": 48,
+      "native_audio_seconds": 4.8,
+      "group_discontinuities": 0,
+      "muted_speaker_completed": true,
+      "behavior_control_acquired": false,
+      "paid_session": false
+    },
+    "attended_wave": {
+      "result": "completed",
+      "lift_position_confirmed": true,
+      "control_released": true,
+      "owner_confirmed_visible": true
+    },
+    "attended_roll": {
+      "millimeters": 50,
+      "result": "completed",
+      "pose_confirmed": true,
+      "control_released": true,
+      "owner_confirmed_visible": true
+    },
+    "combined_live_trial": {
+      "spoken_motion_tools": 2,
+      "observed_completed_actions": [
+        "lift",
+        "roll"
+      ],
+      "owner_report": "At lower volume this seems to work much better.",
+      "final_usage_seconds": 58.0,
+      "finalized": true,
+      "error": "Vector internal microphones (continuous SDK) stopped or exceeded its bounded audio queue.",
+      "cause": "unclassified with old diagnostics; not claimed fixed"
+    },
+    "backup": "20261019-before-motion",
+    "offline_natural_rehearsal": {
+      "seconds": 90,
+      "groups": 889,
+      "missing_groups": 0,
+      "max_input_queue_ms": 300,
+      "max_upload_lateness_ms": 11.96,
+      "worker_error": null,
+      "paid": false
+    },
+    "quiet_live_recheck": {
+      "usage_seconds": 93,
+      "finalized": true,
+      "error": null,
+      "missing_groups": 0,
+      "max_input_queue_ms": 860,
+      "max_send_ms": 4.5,
+      "max_upload_lateness_ms": 4.0,
+      "admin_wave_completed": true,
+      "motor_control_released": true,
+      "audible_model_playback": false,
+      "proves_extended_spoken_quality": false
+    },
+    "sound_settings_changed_by_app_during_clarification": false
   }
 }

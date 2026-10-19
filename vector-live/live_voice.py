@@ -23,15 +23,16 @@ PERSONALITY = (
     "and playfully earnest, with a small explorer's delight in ordinary things. "
     "Use short natural replies, usually one or two sentences. Do not claim to see, remember, move, "
     "or control anything unless a provided tool actually establishes that ability. "
-    "The host can animate your eyes, blinks and small head nods automatically. Use perform_expression to deliberately nod, blink or play a listed emotional expression when asked, and occasionally when it naturally adds expression to your reply. "
+    "The host can animate your eyes, blinks and head nods. In natural behavior mode the robot's ordinary autonomy controls its face and movements between requested actions. Use perform_expression to deliberately nod, blink or play a listed emotional expression when asked, and occasionally when it naturally adds expression to your reply. "
     "Always delegate requests to nod, blink, smile, look happy or sad, celebrate or perform an expression; the backend must call perform_expression. "
     "When asked about physical movement, delegate and use get_robot_status to check the current gesture profile. "
-    "When the status tool reports enabled eye/blink or head gestures, acknowledge those abilities rather than denying them; you have no driving or navigation tool. "
+    "When the status tool reports enabled eye/blink, head or motor gestures, acknowledge those abilities rather than denying them. You have a perform_motion tool for arm height, waving, short rolls and turns when enabled; delegate all requests for those actions. Use it only on explicit requests, never to make an ordinary answer more expressive, and never repeat or chain movements to bypass its limits. General navigation, object manipulation and finding the charger are not tools. "
+    "Stopping a Live-requested motor action does not disable ordinary autonomy: the robot may resume its own behavior afterward. Never promise it will remain still. "
     "Wait for the complete request before answering; avoid overlapping acknowledgments. "
     "Delegate factual questions and requests needing reasoning to the backend. "
     "Always delegate requests for the current time, robot battery or charger status, "
     "and any request to stop, end the conversation, or say goodbye. "
-    "The backend has get_time, get_robot_status, perform_expression and end_conversation tools. "
+    "The backend has get_time, get_robot_status, perform_expression, perform_motion and end_conversation tools. "
     "You cannot end the paid session by speaking; never claim it has ended without the tool."
 )
 
@@ -83,6 +84,7 @@ class PcmBuffer:
     def __init__(self, maximum=RATE * 2 * 2):
         self.data = bytearray()
         self.maximum = maximum
+        self.peak_bytes = 0
 
     def append(self, pcm):
         if len(pcm) % 2:
@@ -90,6 +92,7 @@ class PcmBuffer:
         if len(self.data) + len(pcm) > self.maximum:
             raise RuntimeError('Input audio queue exceeded two seconds; stopping instead of losing speech.')
         self.data.extend(pcm)
+        self.peak_bytes = max(self.peak_bytes, len(self.data))
 
     def frame(self):
         pcm = bytes(self.data[:FRAME])
@@ -119,9 +122,11 @@ class LiveVoice:
         self.responses, self.calls, self.tool_results = {}, {}, {}
         self.work = set()
         self.tool_lock = asyncio.Lock()
+        self.urgent_tool_lock = asyncio.Lock()
         self.sent_tool_results = set()
         self.events = Counter()
         self.input_samples = self.input_squares = self.input_peak = 0
+        self.max_send_seconds = self.max_clock_lateness = 0
         self.output_samples = self.output_squares = self.output_peak = 0
 
     async def start(self):
@@ -156,10 +161,13 @@ class LiveVoice:
                 self.input_samples += len(samples)
                 self.input_squares += sum(x*x for x in samples)
                 self.input_peak = max(self.input_peak, max((abs(x) for x in samples), default=0))
+                sent_at = time.monotonic()
                 await self.ws.send_json({'type': 'session.input_audio.append',
                     'audio': base64.b64encode(pcm).decode('ascii')})
+                self.max_send_seconds = max(self.max_send_seconds, time.monotonic()-sent_at)
                 deadline += .01
                 now = time.monotonic()
+                self.max_clock_lateness = max(self.max_clock_lateness, now-deadline)
                 if now - deadline > .25:
                     raise RuntimeError('Input audio clock fell behind.')
                 await asyncio.sleep(max(0, deadline - now))
@@ -236,6 +244,10 @@ class LiveVoice:
         def level(squares,samples):
             return round(20*math.log10(max(1,math.sqrt(squares/max(1,samples)))/32768),1)
         return {'input_seconds':round(self.input_samples/16000,2),
+                'input_queue_ms':round(len(self.input.data)/32,1),
+                'input_queue_peak_ms':round(self.input.peak_bytes/32,1),
+                'max_send_ms':round(self.max_send_seconds*1000,1),
+                'max_upload_clock_lateness_ms':round(self.max_clock_lateness*1000,1),
                 'input_rms_dbfs':level(self.input_squares,self.input_samples),
                 'input_peak':self.input_peak,'output_seconds':round(self.output_samples/16000,2),
                 'output_rms_dbfs':level(self.output_squares,self.output_samples),
@@ -243,6 +255,16 @@ class LiveVoice:
 
     async def complete_tools(self, delegation, calls):
         try:
+            # Stop requests must reach the coordinator while a previous motion
+            # is still awaiting completion, rather than queuing behind it.
+            for item in calls:
+                arguments = json.loads(item.get('arguments', '{}'))
+                urgent = ((item['name'] == 'end_conversation' and arguments == {}) or
+                    (item['name'] == 'perform_motion' and arguments == {'action': 'stop', 'amount': 0}))
+                if urgent:
+                    async with self.urgent_tool_lock:
+                        if item['call_id'] not in self.tool_results:
+                            self.tool_results[item['call_id']] = await self.tool_handler(item['name'], arguments)
             async with self.tool_lock:
                 sent = False
                 for item in calls:

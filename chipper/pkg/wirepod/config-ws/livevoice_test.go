@@ -194,10 +194,16 @@ func TestGestureOptionsAndPreviewValidateWithoutStartingSession(t *testing.T) {
 	}{
 		{"options", `{"nod_depth":2,"nod_interval":30,"legacy_animations":false}`, 200},
 		{"options", `{"nod_depth":20,"nod_interval":4,"legacy_animations":true}`, 200},
+		{"options", `{"autonomy":true,"motion":"full"}`, 200},
+		{"options", `{"autonomy":false,"motion":"arms"}`, 200},
+		{"options", `{"autonomy":1}`, 400}, {"options", `{"motion":"roam"}`, 400},
 		{"options", `{"nod_depth":21}`, 400}, {"options", `{"nod_depth":true}`, 400},
 		{"options", `{"nod_interval":3}`, 400}, {"options", `{"legacy_animations":"true"}`, 400},
 		{"expression", `{"expression":"happy","depth_degrees":0}`, 202},
 		{"expression", `{"expression":"nod","depth_degrees":20}`, 202},
+		{"expression", `{"expression":"wave","depth_degrees":0}`, 202},
+		{"expression", `{"expression":"rollForward","depth_degrees":0}`, 202},
+		{"expression", `{"expression":"stopMotion","depth_degrees":0}`, 202},
 		{"expression", `{"expression":"nod","depth_degrees":21}`, 400},
 		{"expression", `{"expression":"blink","depth_degrees":8}`, 400},
 		{"expression", `{"expression":"arbitrary","depth_degrees":0}`, 400},
@@ -213,7 +219,7 @@ func TestGestureOptionsAndPreviewValidateWithoutStartingSession(t *testing.T) {
 	r.Header.Set("Origin", "http://elsewhere.example")
 	w := httptest.NewRecorder()
 	handleLiveAdmin(w, r)
-	if w.Code != 403 || forwarded != 4 || len(*calls) != 0 {
+	if w.Code != 403 || forwarded != 9 || len(*calls) != 0 {
 		t.Fatal("gesture mutation bypassed validation or started voice")
 	}
 }

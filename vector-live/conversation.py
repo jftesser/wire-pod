@@ -56,12 +56,26 @@ async def _conversation(args, robot, status, resources):
                          on_render=host.rendered if host else None,
                          on_cancel=host.cancel_render if host else None)
     stop = asyncio.Event()
+    async def action_result(task):
+        try:
+            return await asyncio.shield(task)
+        except asyncio.CancelledError:
+            if not task.cancelled():
+                raise
+            return behaviors.last_expression or {'status': 'cancelled'}
     async def tool_handler(name, arguments):
+        if name == 'perform_motion':
+            if not isinstance(arguments, dict) or set(arguments) != {'action', 'amount'}:
+                raise ValueError('Supply action and amount.')
+            try:
+                return await action_result(behaviors.start_motion(arguments['action'], arguments['amount']))
+            except ValueError as exc:
+                return {'status': 'unavailable', 'reason': str(exc)}
         if name == 'perform_expression':
             if not isinstance(arguments, dict) or set(arguments) != {'expression', 'depth_degrees'}:
                 raise ValueError('Supply expression and depth_degrees.')
             try:
-                return await behaviors.start_expression(arguments['expression'], arguments['depth_degrees'])
+                return await action_result(behaviors.start_expression(arguments['expression'], arguments['depth_degrees']))
             except ValueError as exc:
                 return {'status': 'unavailable', 'reason': str(exc)}
         if not isinstance(arguments, dict) or arguments:
@@ -73,7 +87,8 @@ async def _conversation(args, robot, status, resources):
                 'head_enabled': behaviors.mode == 'head' and not behaviors.error,
                 'head_currently_permitted': behaviors.safe_head(),
                 'completed_head_nods': behaviors.nods_completed,
-                'driving_available': False}}
+                'driving_available': behaviors.motion == 'full',
+                'autonomy_between_actions': behaviors.autonomy}}
         if name == 'get_time':
             return {'time': datetime.now(ZoneInfo('America/New_York')).isoformat(), 'timezone': 'America/New_York'}
         if name == 'end_conversation':
@@ -88,12 +103,18 @@ async def _conversation(args, robot, status, resources):
         ('get_time', 'Get the current local date and time in New York.'),
         ('end_conversation', 'End this paid voice session when the person clearly asks to stop, end the conversation or says goodbye.')]]
     tools.append({'type': 'function', 'name': 'perform_expression',
-        'description': 'Perform one real nod, blink or quiet legacy expression. Can accompany speech. Report the actual result; off/unsafe/unavailable requests are refused. Wheels and lift never move.',
+        'description': 'Perform one real nod, blink or quiet legacy expression. Can accompany speech. Report the actual result; off/unsafe/unavailable requests are refused.',
         'parameters': {'type': 'object', 'properties': {
             'expression': {'type': 'string', 'enum': ['nod', 'blink', *LEGACY_MAP]},
             'depth_degrees': {'type': 'integer', 'minimum': 0, 'maximum': 20,
                 'description': 'For nod:0uses saved depth; otherwise2–20degrees. Use0for every other expression.'}},
             'required': ['expression', 'depth_degrees'], 'additionalProperties': False}, 'strict': True})
+    tools.append({'type': 'function', 'name': 'perform_motion',
+        'description': 'Request one finite robot motion, or stop Live-requested actions. lift: arm height0–100percent; wave:amount0; roll: signed millimeters -50..100 (absolute minimum10); turn: signed degrees ±5..90, positive left. stop:amount0. Wheels require off-charger, low arms, fresh safe state and adequate forward clearance. Never claim movement without completed status. Do not loop or chain moves to exceed bounds. Use only on explicit movement requests.',
+        'parameters': {'type': 'object', 'properties': {
+            'action': {'type': 'string', 'enum': ['lift', 'wave', 'roll', 'turn', 'stop']},
+            'amount': {'type': 'number', 'minimum': -90, 'maximum': 100}},
+            'required': ['action', 'amount'], 'additionalProperties': False}, 'strict': True})
     session = LiveVoice(read_key(args.key_file), player.feed, voice=FALLBACK_VOICE,
         preferred_voice_name=PREFERRED_VOICE, greet=args.greet, tools=tools, tool_handler=tool_handler, input_mode=args.input_mode)
     behaviors = ConversationBehaviors(robot, player, session)
@@ -112,6 +133,10 @@ async def _conversation(args, robot, status, resources):
                 behaviors.mode = settings['expressions'] if continuous else 'off'
                 behaviors.nod_depth, behaviors.nod_interval = settings['nod_depth'], settings['nod_interval']
                 behaviors.legacy_enabled = settings['legacy_animations']
+                behaviors.motion = settings['motion']
+                # Ownership changes apply at the next Start. Releasing the
+                # session-wide control context mid-playback is not atomic.
+                behaviors.autonomy_pending = settings['autonomy'] != behaviors.autonomy
             except (OSError, ValueError):
                 failure = 'Live volume settings are unavailable or invalid.'
                 stop.set()
@@ -215,10 +240,12 @@ async def _conversation(args, robot, status, resources):
             behaviors.mode = settings['expressions'] if continuous else 'off'
             behaviors.nod_depth, behaviors.nod_interval = settings['nod_depth'], settings['nod_interval']
             behaviors.legacy_enabled = settings['legacy_animations']
+            behaviors.autonomy, behaviors.motion = settings['autonomy'], settings['motion']
             volume_watch = asyncio.create_task(watch_volume())
         if host:
             # Verify local input and control before opening a paid session.
-            await controls.enter_async_context(robot.control())
+            if not behaviors.autonomy:
+                await controls.enter_async_context(robot.control())
             await host.start(session)
             resources.push_async_callback(host.close)
             if host.error or not host.running:

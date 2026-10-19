@@ -162,10 +162,13 @@ func handleLiveAdmin(w http.ResponseWriter, r *http.Request) {
 			NodDepth         *int    `json:"nod_depth"`
 			NodInterval      *int    `json:"nod_interval"`
 			LegacyAnimations *bool   `json:"legacy_animations"`
+			Autonomy         *bool   `json:"autonomy"`
+			Motion           *string `json:"motion"`
 		}
 		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024))
 		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&body); err != nil || (body.Boost == nil && body.Expressions == nil && body.NodDepth == nil && body.NodInterval == nil && body.LegacyAnimations == nil) ||
+		if err := decoder.Decode(&body); err != nil || (body.Boost == nil && body.Expressions == nil && body.NodDepth == nil && body.NodInterval == nil && body.LegacyAnimations == nil && body.Autonomy == nil && body.Motion == nil) ||
+			(body.Motion != nil && *body.Motion != "off" && *body.Motion != "arms" && *body.Motion != "full") ||
 			(body.Boost != nil && *body.Boost != 0 && *body.Boost != 3 && *body.Boost != 6) ||
 			(body.Expressions != nil && *body.Expressions != "off" && *body.Expressions != "eyes" && *body.Expressions != "head") ||
 			(body.NodDepth != nil && (*body.NodDepth < 2 || *body.NodDepth > 20)) ||
@@ -189,6 +192,12 @@ func handleLiveAdmin(w http.ResponseWriter, r *http.Request) {
 		if body.LegacyAnimations != nil {
 			payload["legacy_animations"] = *body.LegacyAnimations
 		}
+		if body.Autonomy != nil {
+			payload["autonomy"] = *body.Autonomy
+		}
+		if body.Motion != nil {
+			payload["motion"] = *body.Motion
+		}
 		raw, _ := json.Marshal(payload)
 		liveMutationLock.Lock()
 		defer liveMutationLock.Unlock()
@@ -207,7 +216,7 @@ func handleLiveAdmin(w http.ResponseWriter, r *http.Request) {
 		}
 		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024))
 		decoder.DisallowUnknownFields()
-		allowed := map[string]bool{"nod": true, "blink": true, "happy": true, "veryHappy": true, "sad": true, "verySad": true, "angry": true, "frustrated": true, "dartingEyes": true, "confused": true, "thinking": true, "celebrate": true, "love": true}
+		allowed := map[string]bool{"nod": true, "blink": true, "happy": true, "veryHappy": true, "sad": true, "verySad": true, "angry": true, "frustrated": true, "dartingEyes": true, "confused": true, "thinking": true, "celebrate": true, "love": true, "armsUp": true, "armsDown": true, "wave": true, "rollForward": true, "rollBack": true, "turnLeft": true, "turnRight": true, "stopMotion": true}
 		if err := decoder.Decode(&body); err != nil || !allowed[body.Expression] || body.Depth == nil || *body.Depth < 0 || *body.Depth > 20 || *body.Depth == 1 || (body.Expression != "nod" && *body.Depth != 0) || decoder.Decode(&struct{}{}) != io.EOF {
 			liveJSON(w, http.StatusBadRequest, map[string]string{"error": "Choose a listed expression and valid nod depth."})
 			return

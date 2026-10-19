@@ -351,3 +351,71 @@ quiet. The admin leaves nod8/cadence12, legacy enabled, volume100and+6dB.
 No OpenAI session was opened; microphone/ordinary autonomy control was released.
 Legacy-head overlap with Live speech and model-selected tools remain attended
 checks, rather than claims established by the silent face-only run.
+
+## Natural behavior, arms and wheels
+
+The deployed controller now supports `autonomy` (boolean, next Start) and
+`motion` (`off`, `arms`, `full`, live). Natural mode keeps the ordinary Vector
+behavior tree active between requested gestures: no session-wide SDK control
+and no automatic RGB face replacement. Each requested SDK gesture temporarily
+acquires DEFAULT control, waits for cancellation/state updates, then releases.
+
+Verified directly on the robot: `SDKDefault.json` has control level20 and
+`disableCliffDetection:false`. The old OVERRIDE_BEHAVIORS priority selected
+SDKOverrideAll, which disables native cliff stopping; all Live control leases
+now use DEFAULT. No robot files or binaries were changed for this feature.
+
+The private command socket, web expression picker and spoken `perform_motion`
+tool support lift height, wave, short signed rolls and turns. SDK requests use
+finite deadlines and zero retries, with fresh-state, pickup, cliff, charger,
+lift-position and forward-range guards. The supervisor polls every50ms during
+motion. Completion also requires measured lift/pose/heading confirmation.
+Spoken stop/end requests bypass pending ordinary tool work; cancellation stops
+motors before releasing temporary control. A natural-mode preference change
+during a session shows as pending until Stop/Start.
+
+Hardware evidence before the attended Live trial:
+
+- Native mic and muted speaker playback worked concurrently without behavior
+  control:48real groups,4.8seconds, zero group discontinuities, no paid session.
+- The owner confirmed the attended wave and50mmforward roll were visible.
+  Both also passed SDK and physical state checks and released control.
+-113Python tests passed on Mac and Pi; Go admin/intent/audio-tap tests passed.
+  A subsequent wrapped-heading turn test passed locally.
+
+Saved configuration: natural behavior enabled, arms/wheels enabled, existing
+volume100and+6dBboost preserved, head profile and quiet legacy clips preserved.
+Backup: `/home/pi/vector-native-backups/20261019-before-motion`.
+
+Natural autonomous travel follows Vector's own policies, rather than the
+100mmforward/50mmreverse/90degreebounds on explicit SDK commands. Reverse has
+no rear range sensor. Stop Live-requested action cancels the explicit action;
+ordinary behavior resumes. General navigation, directed object manipulation
+and finding the charger are not exposed as Live tools. Combined speech,
+motor-noise AEC and native autonomous vocalizations need attended assessment.
+
+Attended Live result: the owner reported the lower-volume experience worked
+much better. A user-started conversation invoked `perform_motion` twice; status
+confirmed a completed lift to100percent and a completed roll during Live. That
+session finalized after58paid seconds with a microphone-helper/queue error.
+It had649source groups, zero missing groups and no worker-reported error.
+The old combined error string does not establish whether the fault was a
+processed-frame stall or input queue overflow. This remains an open reliability
+issue; no claim is made that it is fixed. Diagnostics now distinguish those
+causes and record peak queue size, network-send time and upload-clock lateness.
+
+The follow-up offline90secondnatural-mode probe passed with synthetic echo
+reference:889groups, zero gaps, maximum input queue300ms, maximum simulated
+upload lateness11.96ms, worker error null. A subsequent quiet Live diagnostic
+finalized93paid seconds with no error, zero missing groups, peak input queue
+860ms, maximum send4.5ms and upload lateness4.0ms. An admin-triggered wave
+completed and released SDK control during that connection. That quiet diagnostic
+had no audible model playback and therefore does not prove sustained spoken
+conversation or motor-noise echo suppression. Metadata is preserved privately
+on the Pi in `natural-live-diagnostic.json` and mirrored in the local ignored
+firmware logs. No audio or transcripts were recorded.
+
+Final checks:116Python tests passed on Mac and Pi, covering distinct stall/overflow
+diagnostics, natural ownership, bounded motion, cancellation and wrapped-heading
+verification. All Pi/controller changes are reversible using the backup above.
+The app did not change the owner's sound settings during volume clarification.

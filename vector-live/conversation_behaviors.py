@@ -1,7 +1,7 @@
 """Optional conversation expressions, independent of microphone/speaker clocks.
 
-Owns only the face and head. A future navigation policy can share this coordinator
-and its fresh robot-state checks; no wheel or lift commands are issued here.
+Coordinates face/head and finite supervised motor actions. Natural mode leaves
+ordinary robot autonomy active between explicitly requested SDK gestures.
 """
 import asyncio
 import contextlib
@@ -12,6 +12,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 from vector_audio import p
 from legacy_animations import catalog, CANCEL_ANIMATION
+from robot_motion import RobotMotion, PREVIEWS, validate_motion
 
 UNSAFE = sum(p.RobotStatus.Value(name) for name in (
     'ROBOT_STATUS_IS_PICKED_UP', 'ROBOT_STATUS_IS_FALLING',
@@ -42,6 +43,12 @@ class ConversationBehaviors:
     def __init__(self, robot, player, session):
         self.robot, self.player, self.session = robot, player, session
         self.mode = 'off'
+        self.autonomy = False
+        self.autonomy_pending = False
+        self.motion = 'off'
+        self.closing = False
+        self.lease_held = False
+        self.motors = RobotMotion(self)
         self.nod_depth, self.nod_interval = 8, 12
         self.legacy_enabled = False
         self.available_animations = set()
@@ -49,6 +56,7 @@ class ConversationBehaviors:
         self.catalog_checked = False
         self.clips = catalog()
         self.gesture = None
+        self.gesture_kind = None
         self.gesture_uses_head = False
         self.animation_name = None
         self.last_expression = None
@@ -64,6 +72,26 @@ class ConversationBehaviors:
 
     def observe(self, robot_state):
         self.observed, self.observed_at = robot_state, time.monotonic()
+
+    def allocate_tag(self):
+        tag = self.next_tag
+        self.next_tag = p.FIRST_SDK_TAG if tag == p.LAST_SDK_TAG else tag+1
+        return tag
+
+    @contextlib.asynccontextmanager
+    async def control_if_needed(self):
+        if not self.autonomy:
+            yield
+            return
+        async with self.robot.control():
+            self.lease_held = True
+            try:
+                # Let ordinary behavior cancellations and fresh stationary state
+                # arrive before dispatching a new SDK action.
+                await asyncio.sleep(.8)
+                yield
+            finally:
+                self.lease_held = False
 
     def safe_head(self):
         state = self.observed
@@ -92,8 +120,7 @@ class ConversationBehaviors:
             for angle in (target, original):
                 if not self.safe_head():
                     return
-                tag = self.next_tag
-                self.next_tag = p.FIRST_SDK_TAG if tag == p.LAST_SDK_TAG else tag+1
+                tag = self.allocate_tag()
                 self.active_tag = tag
                 response = await self.robot.stub.SetHeadAngle(p.SetHeadAngleRequest(
                     angle_rad=angle, max_speed_rad_per_sec=.35, accel_rad_per_sec2=1,
@@ -114,6 +141,10 @@ class ConversationBehaviors:
                 self.active_tag = None
 
     async def load_animations(self):
+        async with self.control_if_needed():
+            await self._load_animations_owned()
+
+    async def _load_animations_owned(self):
         self.catalog_checked = True
         self.animation_name = 'preflight'
         self.gesture_uses_head = False
@@ -142,10 +173,16 @@ class ConversationBehaviors:
 
     def capabilities(self):
         return dict(nod_depth=self.nod_depth, nod_interval=self.nod_interval,
+            autonomy=self.autonomy, autonomy_pending=self.autonomy_pending, motion=self.motion, motor_action=self.motors.action,
+            motor_actions_completed=self.motors.completed,
             legacy_animations=self.legacy_enabled, animation_catalog=sorted(self.available_animations),
             animation_error=self.legacy_error, last_expression=self.last_expression)
 
     def start_expression(self, name, depth=0):
+        if name in PREVIEWS:
+            if depth != 0:
+                raise ValueError('Nod depth does not apply to motor actions.')
+            return self.start_motion(*PREVIEWS[name])
         if name not in ('nod', 'blink', *self.clips) or type(depth) is not int or not 0 <= depth <= 20 or depth == 1:
             raise ValueError('Choose a known expression and nod depth0or2–20.')
         if name != 'nod' and depth != 0:
@@ -159,6 +196,7 @@ class ConversationBehaviors:
         if name not in ('nod', 'blink') and (not self.legacy_enabled or name not in self.available_animations):
             raise ValueError('This quiet legacy expression is disabled or unavailable.')
         self.gesture_uses_head = name == 'nod' or (name != 'blink' and self.safe_head())
+        self.gesture_kind = 'expression'
         self.last_expression = dict(name=name, status='running', head_tracks=self.gesture_uses_head)
         self.gesture = asyncio.create_task(self._expression(name, depth))
         return self.gesture
@@ -175,6 +213,17 @@ class ConversationBehaviors:
                 await self.robot.stub.StopAllMotors(p.StopAllMotorsRequest(), timeout=.5)
 
     async def _expression(self, name, depth):
+        try:
+            async with self.control_if_needed():
+                return await self._expression_owned(name, depth)
+        except asyncio.CancelledError:
+            self.last_expression = dict(name=name, status='cancelled', error='Expression cancelled.')
+            raise
+        except Exception:
+            self.last_expression = dict(name=name, status='failed', error='Expression control unavailable.')
+            return self.last_expression
+
+    async def _expression_owned(self, name, depth):
         native = name not in ('nod', 'blink')
         completed = False
         error = None
@@ -220,6 +269,50 @@ class ConversationBehaviors:
             self.gesture.cancel()
             await asyncio.gather(self.gesture, return_exceptions=True)
 
+    def start_motion(self, action, amount=0):
+        validate_motion(action, amount)
+        if action == 'stop':
+            return asyncio.create_task(self.stop_motion())
+        if self.animation_name or (self.gesture and not self.gesture.done()):
+            raise ValueError('Another expression or motor action is running.')
+        reason = self.motors.reason(action, amount, continuing=self.autonomy)
+        if reason:
+            raise ValueError(reason)
+        self.gesture_uses_head = False
+        self.gesture_kind = 'motion'
+        self.last_expression = dict(name=action, amount=amount, status='running')
+        self.gesture = asyncio.create_task(self._motion(action, amount))
+        return self.gesture
+
+    async def _motion(self, action, amount):
+        completed, error = False, None
+        self.animation_name = 'motor action'
+        try:
+            await self.cancel_head()
+            async with self.control_if_needed():
+                await self.motors.perform(action, amount)
+            completed = True
+        except asyncio.CancelledError:
+            error = 'Motion cancelled.'
+            raise
+        except (ValueError, RuntimeError) as exc:
+            error = str(exc)
+        except Exception:
+            error = 'Robot motor action failed.'
+        finally:
+            self.animation_name = None
+            self.last_expression = dict(name=action, amount=amount,
+                status='completed' if completed else 'cancelled' if error == 'Motion cancelled.' else 'failed', error=error)
+        return self.last_expression
+
+    async def stop_motion(self):
+        had_action = self.gesture and not self.gesture.done()
+        await self.cancel_expression()
+        await self.cancel_head()
+        # Cancelling a supervised action stops its motors before releasing its
+        # temporary lease. Do not seize idle autonomy simply to stop no action.
+        return {'status': 'stopped' if had_action else 'idle', 'scope': 'Live-requested actions'}
+
     async def run(self):
         previous = None
         next_frame = 0
@@ -228,11 +321,11 @@ class ConversationBehaviors:
             while True:
                 now = time.monotonic()
                 if self.gesture and not self.gesture.done() and (
-                    self.mode == 'off' or getattr(self.robot, 'control_error', None)
+                    (self.mode == 'off' and self.gesture_kind != 'motion') or getattr(self.robot, 'control_error', None)
                     or (self.gesture_uses_head and not self.safe_head())
                     or (self.animation_name in self.clips and not self.legacy_enabled)):
                     await self.cancel_expression()
-                if self.legacy_enabled and self.mode != 'off' and not self.catalog_checked and not self.head and not self.player.clip and not (self.gesture and not self.gesture.done()):
+                if not self.autonomy and self.legacy_enabled and self.mode != 'off' and not self.catalog_checked and not self.head and not self.player.clip and not (self.gesture and not self.gesture.done()):
                     await self.load_animations()
                 if self.head and (self.head.done() or not self.safe_head()):
                     await self.cancel_head()
@@ -243,6 +336,12 @@ class ConversationBehaviors:
                     state = ('speaking' if self.player.clip is not None else
                              'thinking' if self.session.backend_pending else 'listening')
                     self.state = state
+                    if self.autonomy:
+                        # Ordinary Vector owns face/head/wheels except during a
+                        # requested SDK action; never repaint his native face.
+                        previous = None
+                        await asyncio.sleep(.1)
+                        continue
                     if state == 'speaking' and previous != state and now-self.last_nod >= self.nod_interval and self.safe_head() and not self.head and not (self.gesture and not self.gesture.done()):
                         self.last_nod = now
                         self.head = asyncio.create_task(self.nod())
@@ -266,10 +365,11 @@ class ConversationBehaviors:
         finally:
             await self.cancel_expression()
             await self.cancel_head()
-            # Face images expire in <=700 ms; releasing SDK control restores
-            # ordinary eyes. Never send another motor command during cleanup.
+            # Pending actions stop before control release. Face images expire
+            # in <=700ms; releasing SDK control restores ordinary eyes.
 
     async def close(self):
+        self.closing = True
         await self.cancel_expression()
         if self.task:
             self.task.cancel()

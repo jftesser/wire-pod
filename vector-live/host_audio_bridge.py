@@ -60,9 +60,12 @@ class HostAudioBridge:
                     destination.input.append(pcm)
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as exc:
             if not self.closing:
-                self.error = self.error or getattr(self, 'source', 'Host microphone') + ' stopped or exceeded its bounded audio queue.'
+                detail = ('processed audio stalled' if isinstance(exc, asyncio.TimeoutError) else
+                    'upload input queue exceeded two seconds' if isinstance(exc, RuntimeError) and str(exc).startswith('Input audio queue exceeded') else
+                    'processed audio frame or transport failed')
+                self.error = self.error or getattr(self, 'source', 'Host microphone') + ': ' + detail + '.'
                 self.running = False
 
     def rendered(self, pcm):

@@ -15,7 +15,7 @@ from voice_settings import save_volume
 
 @pytest.mark.parametrize('input_source', ['host', 'vector-sdk'])
 @pytest.mark.parametrize('failure', [None, 'microphone', 'paid_start', 'control', 'ready_cue'])
-def test_continuous_session_releases_every_resource(monkeypatch, failure, input_source):
+def test_continuous_session_releases_every_resource(monkeypatch, failure, input_source, autonomy=False):
     instances = {}
     class Events:
         def __aiter__(self):
@@ -36,7 +36,7 @@ def test_continuous_session_releases_every_resource(monkeypatch, failure, input_
             self.closed = True
         async def play_stream(self, frames, volume, **options):
             assert instances['session'].sender is not None
-            assert instances['host'].running and self.controlled
+            assert instances['host'].running and self.controlled == (not autonomy)
             assert volume == (0 if instances.get('settings') else 25)
             if failure == 'ready_cue':
                 raise RuntimeError('Synthetic ready cue failure.')
@@ -64,7 +64,7 @@ def test_continuous_session_releases_every_resource(monkeypatch, failure, input_
             self.tool_handler = options['tool_handler']
         async def start(self):
             assert instances['host'].running
-            assert instances['robot'].controlled
+            assert instances['robot'].controlled == (not autonomy)
             if failure == 'paid_start':
                 raise RuntimeError('offline simulated connection failure')
             physical = await self.tool_handler('get_robot_status', {})
@@ -116,7 +116,8 @@ def test_continuous_session_releases_every_resource(monkeypatch, failure, input_
                 greet=False, ready_tone=input_source == 'vector-sdk', expression_socket=str(path/'expr.sock'), seconds=.15, local_socket=str(path/'voice.sock'), audition=False)
             if failure is None and input_source=='vector-sdk':
                 instances['settings']=str(path/'settings.json')
-                save_volume(instances['settings'],80)
+                from voice_settings import save_settings
+                save_settings(instances['settings'],dict(volume=80,autonomy=autonomy))
                 args.settings_file=instances['settings']
             if failure:
                 if failure=='ready_cue' and input_source=='host':
@@ -141,3 +142,7 @@ def test_continuous_session_releases_every_resource(monkeypatch, failure, input_
             assert instances['session'].closed and instances['host'].closed
             assert instances['robot'].closed and not instances['robot'].controlled
     asyncio.run(check())
+
+
+def test_natural_conversation_has_no_session_wide_control_lease(monkeypatch):
+    test_continuous_session_releases_every_resource(monkeypatch,None,'vector-sdk',autonomy=True)

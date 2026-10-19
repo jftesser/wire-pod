@@ -138,7 +138,9 @@ class VectorAudio:
     @contextlib.asynccontextmanager
     async def control(self):
         stream = self.stub.BehaviorControl()
-        await stream.write(p.BehaviorControlRequest(control_request=p.ControlRequest(priority=p.ControlRequest.OVERRIDE_BEHAVIORS)))
+        # SDKOverrideAll disables firmware stop-on-cliff. DEFAULT selects
+        # SDKDefault, whose native cliff protection remains enabled.
+        await stream.write(p.BehaviorControlRequest(control_request=p.ControlRequest(priority=p.ControlRequest.DEFAULT)))
         self.control_error = None
         granted = asyncio.get_running_loop().create_future()
         closing = False

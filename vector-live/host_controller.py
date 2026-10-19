@@ -49,6 +49,7 @@ class Controller:
             microphone_active=False, speaking=False, volume=self.volume,
             configured_volume=self.volume, volume_available=bool(self.settings_file), volume_pending=False)
         result.update(boost_db=self.settings['boost_db'], expressions=self.settings['expressions'],
+                      autonomy=self.settings['autonomy'], autonomy_pending=False, motion=self.settings['motion'], motor_action=None, motor_actions_completed=0,
                       voice_policy=VOICE_POLICY, voice_name=None, voice_fallback_reason=None,
                       configured_options=dict(self.settings), expressions_state='off', expressions_error=None, nod_depth=self.settings['nod_depth'], nod_interval=self.settings['nod_interval'],
                       legacy_animations=self.settings['legacy_animations'], animation_catalog=[], animation_error=None, last_expression=None)
@@ -72,7 +73,7 @@ class Controller:
             starting = self.spawned_at is not None and time.monotonic() - self.spawned_at < 7
             result.update(mode='continuous', phase=('starting' if starting else 'unverified') if not heartbeat else heartbeat.get('phase', 'unverified'))
             if heartbeat:
-                for key in ('ready', 'microphone_active', 'speaking', 'elapsed_seconds', 'volume', 'speaker_segments_completed', 'boost_db', 'expressions', 'expressions_state', 'expressions_error', 'nod_depth', 'nod_interval', 'legacy_animations', 'animation_catalog', 'animation_error', 'last_expression', 'voice_name', 'voice_fallback_reason'):
+                for key in ('ready', 'microphone_active', 'speaking', 'elapsed_seconds', 'volume', 'speaker_segments_completed', 'boost_db', 'expressions', 'expressions_state', 'expressions_error', 'nod_depth', 'nod_interval', 'legacy_animations', 'animation_catalog', 'animation_error', 'last_expression', 'voice_name', 'voice_fallback_reason', 'autonomy', 'autonomy_pending', 'motion', 'motor_action', 'motor_actions_completed'):
                     if key in heartbeat:
                         result[key] = heartbeat[key]
             if self.stopping or self.closing:

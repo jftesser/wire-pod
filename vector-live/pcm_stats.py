@@ -43,6 +43,7 @@ class AudioStats:
     def report(self):
         rms = math.sqrt(self.squares / self.samples) if self.samples else 0
         return {"frames": self.frames, "audio_seconds": round(self.samples / RATE, 3),
+                "source_wall_seconds": round(self.last-self.first,3) if self.first is not None and self.last is not None else 0,
                 "rms_dbfs": round(20 * math.log10(max(rms, 1) / 32768), 1),
                 "peak_dbfs": round(20 * math.log10(max(self.peak, 1) / 32768), 1),
                 "group_discontinuities": self.gaps, "max_delivery_interval_ms": round(self.max_interval * 1000, 1),

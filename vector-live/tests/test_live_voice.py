@@ -48,3 +48,26 @@ def test_tool_results_use_live_item_protocol_and_are_deduplicated():
         assert [e['type'] for e in events] == ['response.item.create', 'response.create']
         assert events[0]['item']['call_id'] == 'one'
     asyncio.run(check())
+
+
+def test_spoken_motor_stop_preempts_a_pending_tool_and_is_deduplicated():
+    async def check():
+        running=asyncio.Event();stopped=asyncio.Event();events=[];executed=[]
+        class Socket:
+            async def send_json(self,event):events.append(event)
+        async def handler(name,args):
+            executed.append((name,args))
+            if args.get('action')=='roll':
+                running.set();await stopped.wait();return {'status':'cancelled'}
+            stopped.set();return {'status':'stopped'}
+        voice=LiveVoice('fake',None,tool_handler=handler);voice.ws=Socket()
+        move=asyncio.create_task(voice.complete_tools('one',[{'call_id':'move','name':'perform_motion','arguments':'{"action":"roll","amount":50}'}]))
+        await running.wait()
+        stop=[{'call_id':'stop','name':'perform_motion','arguments':'{"action":"stop","amount":0}'}]
+        await asyncio.wait_for(voice.complete_tools('two',stop),.5)
+        await move
+        await voice.complete_tools('two',stop)
+        assert len(executed)==2
+        outputs=[e for e in events if e['type']=='response.item.create']
+        assert {e['item']['call_id'] for e in outputs}=={'move','stop'} and len(outputs)==2
+    asyncio.run(check())

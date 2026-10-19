@@ -1,6 +1,7 @@
 """Bounded native capture/APM/upload-clock rehearsal; no cloud or playback."""
 import argparse
 import asyncio
+import contextlib
 import json
 import resource
 import time
@@ -32,7 +33,7 @@ async def run(args):
     worker_memory = {}
     failure = None
     try:
-        async with robot.control():
+        async with (contextlib.nullcontext() if args.natural else robot.control()):
             await bridge.start(destination)
             destination.sender = object()
             deadline = time.monotonic() + args.seconds
@@ -67,7 +68,7 @@ async def run(args):
         wall_seconds=round(elapsed,2), main_cpu_percent=round(100*(time.process_time()-cpu)/elapsed,2),
         main_peak_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
         worker_memory_kib=worker_memory, paid_api=False, audible_playback=False,
-        room_audio_recorded=False, synthetic_render_reference=args.render_reference,
+        room_audio_recorded=False, synthetic_render_reference=args.render_reference, ordinary_autonomy=args.natural,
         worker_error=bridge.worker_error, source_clock=bridge.clock.report(), error=failure)
     print(json.dumps(report), flush=True)
     if failure:
@@ -81,6 +82,7 @@ if __name__ == '__main__':
     parser.add_argument('--audio-python', default='/home/pi/vector-native-audio/bin/python')
     parser.add_argument('--seconds', type=int, default=60)
     parser.add_argument('--render-reference', action='store_true', help='Simulate continuous speaker reference silently.')
+    parser.add_argument('--natural', action='store_true', help='Leave ordinary robot behavior active; do not acquire SDK control.')
     args = parser.parse_args()
     if not 5 <= args.seconds <= 120:
         parser.error('Probe duration must be5–120 seconds.')
