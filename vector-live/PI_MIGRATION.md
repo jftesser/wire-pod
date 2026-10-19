@@ -181,3 +181,40 @@ Pi-local controller migration.
 
 Corrected audible voice quality and spoken exit remain an owner-present check;
 no additional audible test is started without a current readiness response.
+
+
+## Saved continuous voice volume
+
+The web admin now includes a0–100continuous voice slider. The controller saves
+`/home/pi/vector-live-runtime/settings.json` atomically with0600permissions.
+The current conversation reads changes every200ms, and its heartbeat reports
+the applied level separately from the saved setting. The slider stays usable
+with Live off and remembers the level across controller restarts. Zero mutes
+continuous voice; it does not stop microphone capture or close a paid session.
+The legacy wake-word prototype has its own startup volume.
+
+Continuous speech uses fixed full-scale stream preparation plus bounded PCM
+attenuation per outgoing frame. The AEC reference receives the accepted PCM
+after gain, so changing volume does not create a reference/output mismatch.
+The setting needs no cloud-session restart or speaker-stream cancellation.
+The native ready cue also respects mute. Python regressions cover0/50/100gain,
+mid-stream changes, exact render reference, private persistence, invalid values,
+active settings polling and cleanup. Go tests cover the authenticated volume
+proxy, range/type checks and rejected cross-origin requests.
+
+The corrected owner-admin rehearsal completed six speaker segments with zero
+native group gaps, no echo-worker error,80seconds final usage and clean closure.
+The first admin attempt failed before readiness, with zero final usage; the old
+exception path omitted its cause. Startup exceptions now preserve their internal
+reason in the private status/log instead of printing a misleading null error.
+No exact cause is claimed for that earlier failure.
+
+
+Volume deployment verification:57Python tests passed on both Mac and Pi; the
+Go audio/admin/intent packages passed, and the volume-enabled server was built
+and activated atomically with its previous binary backed up. In the actual web
+page, the slider saved79, retained79after a controller restart and page reload,
+and was returned to the owner's80setting. The deployed API rejected101with400
+and an unrelated Origin with403. No paid session or playback was opened for
+these checks. The live-gain and echo-reference behavior has offline coverage;
+perceived level can be checked during the next owner-started conversation.

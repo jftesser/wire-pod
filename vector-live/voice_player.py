@@ -8,6 +8,17 @@ import contextlib
 import math
 import struct
 from collections import deque
+from voice_settings import validate_volume
+
+
+def volume_pcm(pcm, volume):
+    validate_volume(volume)
+    if volume == 100:
+        return pcm
+    if volume == 0:
+        return bytes(len(pcm))
+    samples = struct.unpack('<' + 'h'*(len(pcm)//2), pcm)
+    return struct.pack('<' + 'h'*len(samples), *(int(sample*volume/100) for sample in samples))
 
 
 def audible(pcm):
@@ -74,15 +85,17 @@ class VoicePlayer:
                 if first is None:
                     continue
                 async def frames():
-                    yield first
+                    yield volume_pcm(first, self.volume)
                     while True:
                         frame = await asyncio.wait_for(self.queue.get(), 3)
                         if frame is None:
                             return
-                        yield frame
+                        yield volume_pcm(frame, self.volume)
                 async def play():
                     async with (contextlib.nullcontext() if self.control_held else self.robot.control()):
-                        await self.robot.play_stream(frames(), self.volume, **self.render_options)
+                        # Fixed stream gain lets each queued PCM frame use the
+                        # newest setting without interrupting robot playback.
+                        await self.robot.play_stream(frames(), 100, **self.render_options)
                 self.clip = asyncio.create_task(play())
                 try:
                     await self.clip

@@ -53,7 +53,8 @@ optional fallback with acoustic rehearsal pending.
 The operator panel at `/vector-live.html` is linked as **Vector Voice** on the
 wire-pod homepage. It has explicit prototype start/stop controls and reports
 service state, a private readiness heartbeat, input activity, speaker activity,
-source and elapsed time. An active process or stale heartbeat does not count
+source and elapsed time. A saved0–100continuous voice slider also updates active
+playback; zero mutes speech without ending the session. An active process or stale heartbeat does not count
 as verified listening. Continuous start is unavailable until a real continuous
 microphone source and controller are configured. See [OVERNIGHT.md](OVERNIGHT.md) for research and
 [EVENT_SETUP.md](EVENT_SETUP.md) for the event plan.

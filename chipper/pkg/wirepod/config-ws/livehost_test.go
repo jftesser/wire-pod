@@ -114,3 +114,23 @@ func TestHostTransportUsesPrivateUnixSocket(t *testing.T) {
 		t.Fatal(result, err)
 	}
 }
+
+func TestIdleVolumeSettingsAndPendingLiveGainAreExposed(t *testing.T) {
+	fakeLiveService(t, "inactive")
+	previous := liveHostCall
+	t.Cleanup(func() { liveHostCall = previous })
+	active := false
+	liveHostCall = func(context.Context, string, string, []byte) (map[string]interface{}, error) {
+		return map[string]interface{}{"active": active, "continuous_available": true, "volume_available": true,
+			"configured_volume": 0, "volume": 80, "volume_pending": active, "mode": "continuous", "phase": "ready"}, nil
+	}
+	s, _ := liveCombinedStatus(context.Background())
+	if s["configured_volume"] != 0 || s["volume_available"] != true {
+		t.Fatal(s)
+	}
+	active = true
+	s, _ = liveCombinedStatus(context.Background())
+	if s["volume"] != 80 || s["configured_volume"] != 0 || s["volume_pending"] != true {
+		t.Fatal(s)
+	}
+}

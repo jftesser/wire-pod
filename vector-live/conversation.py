@@ -22,6 +22,7 @@ from voice_player import VoicePlayer
 from runtime_status import RuntimeStatus
 from host_audio_bridge import HostAudioBridge
 from native_audio_bridge import NativeAudioBridge
+from voice_settings import read_volume
 
 
 async def conversation(args):
@@ -73,15 +74,25 @@ async def _conversation(args, robot, status, resources):
     active = set()
     capture_lock = asyncio.Lock()
     last_input = time.monotonic()
-    tunnel = touch = server = heartbeat = None
+    tunnel = touch = server = heartbeat = volume_watch = None
     ready = False
     failure = None
+    async def watch_volume():
+        nonlocal failure
+        while True:
+            try:
+                player.volume = read_volume(args.settings_file, player.volume)
+            except (OSError, ValueError):
+                failure = 'Live volume settings are unavailable or invalid.'
+                stop.set()
+                return
+            await asyncio.sleep(.2)
     async def publish_status():
         while True:
             status.write(phase='ready' if ready else 'starting', ready=ready,
                 microphone_active=(host.running and host.frames > 0 and not host.error and (not native or (host.last_native_frame is not None and time.monotonic()-host.last_native_frame < 1))) if host else capture_lock.locked(), speaking=player.clip is not None,
                 input_idle_seconds=round(time.monotonic() - (host.last_activity if host else last_input), 1),
-                speaker_segments_completed=player.segments_played)
+                speaker_segments_completed=player.segments_played, volume=player.volume)
             await asyncio.sleep(2)
     async def capture(reader, writer):
         nonlocal last_input, failure
@@ -163,6 +174,9 @@ async def _conversation(args, robot, status, resources):
 
     try:
         print(json.dumps({'robot': await robot.status()}), flush=True)
+        if getattr(args, 'settings_file', None):
+            player.volume = read_volume(args.settings_file, args.volume)
+            volume_watch = asyncio.create_task(watch_volume())
         if host:
             # Verify local input and control before opening a paid session.
             await controls.enter_async_context(robot.control())
@@ -176,7 +190,7 @@ async def _conversation(args, robot, status, resources):
         if native and getattr(args, 'ready_tone', False):
             async def cue():
                 yield tone_pcm(.35)
-            await robot.play_stream(cue(), 25, on_render=host.rendered, on_cancel=host.cancel_render)
+            await robot.play_stream(cue(), min(25, player.volume), on_render=host.rendered, on_cancel=host.cancel_render)
         player.task = asyncio.create_task(player.run())
         touch = asyncio.create_task(touch_stop())
         manager = contextlib.nullcontext(None) if (native or args.local_socket) else tempfile.TemporaryDirectory(prefix='vl-', dir='/private/tmp')
@@ -224,7 +238,13 @@ async def _conversation(args, robot, status, resources):
             if time.monotonic() >= deadline:
                 print(json.dumps({'stop': 'maximum_duration'}), flush=True)
             stop.set()
+    except Exception as exc:
+        failure = failure or (str(exc) if isinstance(exc, RuntimeError) else type(exc).__name__)
+        raise
     finally:
+        if volume_watch:
+            volume_watch.cancel()
+            await asyncio.gather(volume_watch, return_exceptions=True)
         if heartbeat:
             heartbeat.cancel()
             await asyncio.gather(heartbeat, return_exceptions=True)
@@ -293,6 +313,7 @@ if __name__ == '__main__':
     parser.add_argument('--local-socket', help='Run directly on the Pi without an SSH bridge.')
     parser.add_argument('--seconds', type=int, default=180)
     parser.add_argument('--volume', type=int, default=80)
+    parser.add_argument('--settings-file', help='Private live operator settings; volume is updated without reopening the session.')
     parser.add_argument('--status-file', help='Private operator-console heartbeat, containing no audio or transcript.')
     parser.add_argument('--audition', action='store_true', help='Use synthetic speech to request a short introduction.')
     parser.add_argument('--ready-tone', action=argparse.BooleanOptionalAction, default=True, help='Play a short local cue after native input and Live are ready.')

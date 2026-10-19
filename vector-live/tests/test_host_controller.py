@@ -83,6 +83,7 @@ def test_pi_controller_serves_local_socket_without_ssh_or_paid_child(monkeypatch
             args = options()
             args.input_source = 'vector-sdk'
             args.local_control_socket = str(path)
+            args.settings_file = str(Path(directory)/'settings.json')
             task = asyncio.create_task(app.serve(args))
             try:
                 for _ in range(100):
@@ -97,6 +98,16 @@ def test_pi_controller_serves_local_socket_without_ssh_or_paid_child(monkeypatch
                         assert state['continuous_available'] and not state['active']
                         assert state['controller_location'] == 'Pi'
                         assert state['source'].startswith('Vector internal')
+                        assert state['configured_volume']==80 and state['volume_available']
+                    for value in (0,100,80):
+                        async with client.post('http://localhost/volume',json={'volume':value}) as response:
+                            assert response.status==200
+                            assert (await response.json())['saved']
+                    restored=Controller(args,directory)
+                    assert restored.volume==80
+                    for body in ({'volume':True},{'volume':101},{'volume':2.5},{'volume':50,'mode':'continuous'}):
+                        async with client.post('http://localhost/volume',json=body) as response:
+                            assert response.status==409
                     async with client.post('http://localhost/start', json={'mode':'wrong'}) as response:
                         assert response.status == 409
             finally:

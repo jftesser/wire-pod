@@ -1,6 +1,6 @@
 {
-  "updated_utc": "2026-10-19T21:37:48.710390+00:00",
-  "state": "Pi deployment complete; corrected audible rehearsal pending owner readiness",
+  "updated_utc": "2026-10-19T21:49:49.829814+00:00",
+  "state": "Pi deployment and saved continuous volume controls active",
   "backend_host": "Pi",
   "mac_audio_or_cloud_dependency": false,
   "pi_controller_enabled": true,
@@ -10,8 +10,8 @@
   "stock_application_preserved": true,
   "api_key_reused_in_existing_approved_file": true,
   "offline_tests": {
-    "Pi": 45,
-    "Mac": 45
+    "Pi": 57,
+    "Mac": 57
   },
   "native_capture_probe": {
     "seconds": 60,
@@ -81,7 +81,20 @@
     },
     "error": null
   },
-  "corrected_attended_trial": "pending",
+  "corrected_attended_trial": {
+    "owner_report": "Second admin-triggered session seemed to work after the first returned an error.",
+    "source_groups": 811,
+    "source_group_gaps": 0,
+    "clock_group_delta_ms": [
+      100,
+      104
+    ],
+    "speaker_segments_completed": 6,
+    "final_usage_seconds": 80.0,
+    "finalized": true,
+    "worker_error": null,
+    "session_error": null
+  },
   "live_session_active": false,
   "room_audio_recorded": false,
   "room_transcripts_logged": false,
@@ -97,5 +110,27 @@
   "pi_reboot_idle_recovery": true,
   "pi_reboot_paid_session_started": false,
   "normal_session_max_seconds": 600,
-  "volume": 80
+  "volume": 80,
+  "post_migration_first_start_error": {
+    "phase": "before conversation readiness",
+    "final_usage_seconds": 0.0,
+    "finalized": true,
+    "exception_type": "RuntimeError",
+    "exact_cause": "not captured by the old exception log; startup exception logging corrected with volume update"
+  },
+  "volume_control": {
+    "admin_slider": [
+      0,
+      100
+    ],
+    "saved_value": 80,
+    "persistent_file": "/home/pi/vector-live-runtime/settings.json",
+    "file_mode": "0600",
+    "browser_save_verified": true,
+    "controller_restart_and_page_reload_preserved_value": true,
+    "active_gain_and_render_reference_offline_verified": true,
+    "deployed_invalid_range_status": 400,
+    "deployed_cross_origin_status": 403,
+    "paid_session_opened_for_volume_checks": false
+  }
 }

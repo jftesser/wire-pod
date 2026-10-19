@@ -138,7 +138,7 @@ func handleLiveAdmin(w http.ResponseWriter, r *http.Request) {
 		liveJSON(w, http.StatusOK, status)
 		return
 	}
-	if endpoint != "start" && endpoint != "stop" {
+	if endpoint != "start" && endpoint != "stop" && endpoint != "volume" {
 		http.NotFound(w, r)
 		return
 	}
@@ -153,6 +153,31 @@ func handleLiveAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 	if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
 		liveJSON(w, http.StatusUnsupportedMediaType, map[string]string{"error": "Expected JSON."})
+		return
+	}
+	if endpoint == "volume" {
+		var body struct {
+			Volume *int `json:"volume"`
+		}
+		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&body); err != nil || body.Volume == nil || *body.Volume < 0 || *body.Volume > 100 {
+			liveJSON(w, http.StatusBadRequest, map[string]string{"error": "Volume must be a whole number from 0 to 100."})
+			return
+		}
+		if decoder.Decode(&struct{}{}) != io.EOF {
+			liveJSON(w, http.StatusBadRequest, map[string]string{"error": "Expected one volume setting."})
+			return
+		}
+		payload, _ := json.Marshal(body)
+		liveMutationLock.Lock()
+		defer liveMutationLock.Unlock()
+		result, err := liveHostCall(ctx, http.MethodPost, "volume", payload)
+		if err != nil {
+			liveJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "Volume could not be saved. Check the voice controller."})
+			return
+		}
+		liveJSON(w, http.StatusOK, result)
 		return
 	}
 	var body struct {
@@ -185,7 +210,7 @@ func handleLiveAdmin(w http.ResponseWriter, r *http.Request) {
 			rememberHost(active)
 		}
 		if hostMayBeActive() {
-			liveJSON(w, http.StatusConflict, map[string]string{"error": "Stop the Mac voice session before starting another mode."})
+			liveJSON(w, http.StatusConflict, map[string]string{"error": "Stop the continuous voice session before starting another mode."})
 			return
 		}
 		status, err := liveStatus(ctx)
@@ -210,7 +235,7 @@ func handleLiveAdmin(w http.ResponseWriter, r *http.Request) {
 	if endpoint == "stop" {
 		liveWakePendingUntil = time.Time{}
 		if _, err := liveHostCall(ctx, http.MethodPost, "stop", []byte(`{}`)); err != nil && hostMayBeActive() {
-			liveJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "Pi voice stopped; Mac controller is unreachable. Remote closure cannot yet be confirmed."})
+			liveJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "Wake-word voice stopped; the continuous controller is unreachable. Closure cannot yet be confirmed."})
 			return
 		}
 	} else {

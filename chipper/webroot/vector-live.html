@@ -16,6 +16,9 @@
   button {font:inherit;cursor:pointer;border:1px solid #668b81;border-radius:10px;padding:12px 18px;margin:6px 8px 6px 0;background:#b0edda;color:#112c23}
   button.secondary {background:transparent;color:#c5d8d1}button.stop {background:#ddafa5;color:#2d1712;border-color:#ddafa5}
   button:disabled {opacity:.4;cursor:not-allowed} #message {min-height:1.5em;color:#f6d990}
+  .volume-label {display:flex;justify-content:space-between;gap:16px;margin-bottom:12px}
+  input[type=range] {width:100%;accent-color:#b0edda;cursor:pointer;min-height:32px;margin:0}
+  .range-labels {display:flex;justify-content:space-between;color:#9dafaa;font-size:.85rem}
   .note {font-size:.9rem} @media(max-width:500px){body{padding:16px}.facts{grid-template-columns:1fr}}
 </style>
 <a href="/">← Wire-Pod</a>
@@ -26,12 +29,18 @@
   <h2 id="mode" style="margin-top:18px">Connecting to voice controls</h2>
   <div class="facts">
     <div><small>Microphone</small><strong id="microphone">—</strong></div>
-    <div><small>Speaker</small><strong id="speaker">—</strong></div>
+    <div><small>Live speaker</small><strong id="speaker">—</strong></div>
     <div><small>Input source</small><strong id="source">—</strong></div>
     <div><small>Session</small><strong id="elapsed">—</strong></div>
   </div>
   <p id="mode-note" class="note"></p>
   <button id="stop" class="stop" disabled>Stop conversation</button>
+</section>
+<section class="panel">
+  <label class="volume-label" for="volume"><strong>Continuous voice volume</strong><output id="volume-value" for="volume">—</output></label>
+  <input id="volume" type="range" min="0" max="100" step="1" value="80" disabled aria-describedby="volume-note">
+  <div class="range-labels"><span>0 · muted</span><span>100 · loudest</span></div>
+  <p id="volume-note" class="note" role="status">Checking volume controls…</p>
 </section>
 <section class="panel">
   <h2>Continuous conversation</h2>
@@ -48,6 +57,7 @@
 <script>
 const $ = id => document.getElementById(id);
 let busy = false, latest = null, actionError = '';
+let volumeTarget = null, volumeSaving = false, volumeTimer = null, volumeError = '';
 async function request(endpoint, body) {
   const options = {signal:AbortSignal.timeout(6000),cache:'no-store'};
   if (body) Object.assign(options,{method:'POST',headers:{'Content-Type':'application/json','X-Vector-Control':'1'},body:JSON.stringify(body)});
@@ -66,7 +76,7 @@ function render(state) {
   $('badge').className = 'badge '+(state.ready?'on':state.phase==='error'?'error':active?'warn':'');
   $('mode').textContent = unknown?'Current mode needs attention':active?(continuous?'Continuous conversation':'Wake-word conversation'):'Ordinary Vector commands';
   $('microphone').textContent = unknown?'Status unknown':state.microphone_active?(continuous?'Listening continuously':'Receiving a wake-word request'):active?(continuous?'Waiting for microphone readiness':'Waiting for “Hey Vector”'):'Handled by ordinary wire-pod';
-  $('speaker').textContent = state.speaking?'Speaking':state.volume?`Quiet · volume ${state.volume}/100`:'Quiet';
+  $('speaker').textContent = state.volume===0?'Muted':state.speaking?`Speaking · volume ${state.volume}/100`:Number.isInteger(state.volume)?`Quiet · volume ${state.volume}/100`:'Quiet';
   $('source').textContent = state.source;
   $('elapsed').textContent = active?`${Math.floor(state.elapsed_seconds || 0)} seconds connected`:'No live session';
   $('mode-note').textContent = state.error || (active?(continuous?'Speak directly without a wake phrase. The input source shown above stays open while Vector speaks.':'This mode requires “Hey Vector” before each turn.'): 'Live voice is off. Ordinary wire-pod is available.');
@@ -74,6 +84,13 @@ function render(state) {
   $('continuous').disabled = busy || active || !state.continuous_available;
   $('wake').disabled = busy || active;
   $('stop').disabled = busy || !active;
+  $('volume').disabled = !state.volume_available;
+  const volume = volumeTarget ?? state.configured_volume ?? state.volume;
+  if (Number.isInteger(volume)) {
+    $('volume').value = volume;
+    $('volume-value').textContent = `${volume}/100`;
+  }
+  $('volume-note').textContent = volumeError || (!state.volume_available?'Volume controls are unavailable.':volumeSaving?'Saving…':state.volume_pending?'Saved · applying to the current conversation…':state.host_active?'Saved · changes apply while Vector speaks. Zero mutes his voice; Stop ends the session.':'Saved for the next continuous conversation.');
 }
 async function refresh() {
   try {render(await request('status')); if (!busy) $('message').textContent=actionError;}
@@ -83,6 +100,7 @@ async function refresh() {
     $('microphone').textContent=$('speaker').textContent=$('source').textContent=$('elapsed').textContent='Unknown';
     $('message').textContent=error.message;
     $('wake').disabled=$('continuous').disabled=true;
+    $('volume').disabled=true;
     $('stop').disabled=busy;
   }
 }
@@ -95,6 +113,28 @@ async function action(endpoint, body) {
 $('wake').onclick=()=>action('start',{mode:'wake'});
 $('continuous').onclick=()=>action('start',{mode:'continuous'});
 $('stop').onclick=()=>action('stop',{});
+async function saveVolume() {
+  if (volumeSaving || volumeTarget===null) return;
+  const value = volumeTarget;
+  volumeSaving=true; volumeError=''; if(latest)render(latest);
+  try {
+    await request('volume',{volume:value});
+    if (volumeTarget===value) volumeTarget=null;
+  } catch(error) {
+    volumeError='Volume was not saved: '+error.message;
+    volumeTarget=null;
+  } finally {
+    volumeSaving=false;
+    await refresh();
+    if(volumeTarget!==null)saveVolume();
+  }
+}
+$('volume').oninput=()=>{
+  volumeTarget=Number($('volume').value); volumeError='';
+  $('volume-value').textContent=`${volumeTarget}/100`;
+  clearTimeout(volumeTimer); volumeTimer=setTimeout(saveVolume,250);
+};
+$('volume').onchange=()=>{clearTimeout(volumeTimer);saveVolume();};
 refresh();setInterval(refresh,2000);
 </script>
 </html>

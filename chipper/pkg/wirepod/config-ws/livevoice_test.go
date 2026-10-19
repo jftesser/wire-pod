@@ -96,3 +96,47 @@ func TestLiveAdminRequiresFreshMatchingHeartbeatBeforeReady(t *testing.T) {
 		}
 	}
 }
+
+func TestLiveVolumeValidatesAndForwardsWithoutStartingVoice(t *testing.T) {
+	calls := fakeLiveService(t, "inactive")
+	previous := liveHostCall
+	t.Cleanup(func() { liveHostCall = previous })
+	forwarded := 0
+	liveHostCall = func(ctx context.Context, method, action string, body []byte) (map[string]interface{}, error) {
+		if method != "POST" || action != "volume" {
+			t.Fatal(method, action)
+		}
+		var settings struct {
+			Volume int `json:"volume"`
+		}
+		if err := json.Unmarshal(body, &settings); err != nil {
+			t.Fatal(err)
+		}
+		forwarded++
+		return map[string]interface{}{"volume": settings.Volume, "saved": true}, nil
+	}
+	for _, body := range []string{`{"volume":0}`, `{"volume":100}`, `{"volume":80}`} {
+		w := httptest.NewRecorder()
+		handleLiveAdmin(w, controlRequest("POST", "volume", body))
+		if w.Code != http.StatusOK {
+			t.Fatal(w.Code, w.Body.String())
+		}
+	}
+	if forwarded != 3 || len(*calls) != 0 {
+		t.Fatal("volume opened voice or missed forwarding")
+	}
+	for _, body := range []string{`{}`, `{"volume":null}`, `{"volume":true}`, `{"volume":2.5}`, `{"volume":-1}`, `{"volume":101}`, `{"volume":80,"mode":"continuous"}`, `{"volume":80} {}`} {
+		w := httptest.NewRecorder()
+		handleLiveAdmin(w, controlRequest("POST", "volume", body))
+		if w.Code != http.StatusBadRequest {
+			t.Fatal(body, w.Code)
+		}
+	}
+	r := controlRequest("POST", "volume", `{"volume":80}`)
+	r.Header.Set("Origin", "https://elsewhere.example")
+	w := httptest.NewRecorder()
+	handleLiveAdmin(w, r)
+	if w.Code != http.StatusForbidden || forwarded != 3 {
+		t.Fatal("invalid volume request reached controller")
+	}
+}

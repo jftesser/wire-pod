@@ -15,8 +15,8 @@ import (
 	"time"
 )
 
-// The optional Mac controller is reachable only through an operator-created SSH
-// Unix-socket forward, in a private directory. No arbitrary URLs or commands.
+// The controller uses a private local Unix socket or an operator-created SSH
+// Unix-socket forward. No arbitrary URLs or commands.
 var liveHostCall = func(ctx context.Context, method, action string, body []byte) (map[string]interface{}, error) {
 	path := os.Getenv("VECTOR_LIVE_HOST_SOCKET")
 	if !strings.HasPrefix(path, "/") {
@@ -118,7 +118,7 @@ func liveCombinedStatus(ctx context.Context) (map[string]interface{}, error) {
 			local["mode"], local["phase"] = "continuous", "unverified"
 			local["ready"], local["microphone_active"], local["speaking"] = false, false, false
 			local["host_active"], local["requires_wake_phrase"] = true, false
-			local["error"] = "Mac controller is unreachable. Session closure cannot yet be confirmed."
+			local["error"] = "Voice controller is unreachable. Session closure cannot yet be confirmed."
 		}
 		return local, nil
 	}
@@ -126,6 +126,14 @@ func liveCombinedStatus(ctx context.Context) (map[string]interface{}, error) {
 	rememberHost(active)
 	local["continuous_available"], local["continuous_reason"] = host["continuous_available"], host["continuous_reason"]
 	local["host_active"] = active
+	for _, key := range []string{"configured_volume", "volume_available", "volume_pending", "controller_location"} {
+		if value, ok := host[key]; ok {
+			local[key] = value
+		}
+	}
+	if !active && local["mode"] == "legacy" {
+		local["volume"] = host["volume"]
+	}
 	if active {
 		delete(local, "error")
 		for _, key := range []string{"mode", "phase", "ready", "source", "requires_wake_phrase", "microphone_active", "speaking", "volume", "elapsed_seconds", "speaker_segments_completed", "error"} {
@@ -150,7 +158,7 @@ func liveHostStart(w http.ResponseWriter, r *http.Request, ctx context.Context) 
 	}
 	host, err := liveHostCall(ctx, http.MethodGet, "status", nil)
 	if err != nil || host["continuous_available"] != true {
-		liveJSON(w, http.StatusConflict, map[string]string{"error": "Continuous host microphone input is not configured or the Mac controller is unavailable."})
+		liveJSON(w, http.StatusConflict, map[string]string{"error": "Continuous microphone input is not configured or the voice controller is unavailable."})
 		return
 	}
 	local, err := liveStatus(ctx)
@@ -169,7 +177,7 @@ func liveHostStart(w http.ResponseWriter, r *http.Request, ctx context.Context) 
 		return
 	}
 	if _, err := liveHostCall(ctx, http.MethodPost, "start", []byte(`{"mode":"continuous"}`)); err != nil {
-		liveJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "Mac voice start failed. Check its local controller."})
+		liveJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "Voice start failed. Check the local controller."})
 		return
 	}
 	rememberHost(true)

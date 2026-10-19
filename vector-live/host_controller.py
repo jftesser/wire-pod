@@ -18,6 +18,7 @@ import time
 from pathlib import Path
 
 from aiohttp import web
+from voice_settings import read_volume, save_volume, validate_volume
 
 
 class Controller:
@@ -31,6 +32,8 @@ class Controller:
         self.last_error = None
         self.closing = False
         self.spawned_at = None
+        self.settings_file = getattr(args, 'settings_file', None)
+        self.volume = read_volume(self.settings_file, args.volume)
 
     def status(self):
         native = getattr(self.args, 'input_source', 'host') == 'vector-sdk'
@@ -40,7 +43,8 @@ class Controller:
             continuous_reason=('Uses Vector’s own microphones. Start checks the running firmware and fresh audio before opening Live.' if native and configured else '') if configured else 'Configure the controller input source and its isolated audio environment.',
             controller_location='Pi' if getattr(self.args, 'local_control_socket', None) else 'remote computer',
             source='Vector internal microphones (continuous SDK)' if native else 'Host microphone: ' + (self.args.microphone_name or 'not selected'),
-            microphone_active=False, speaking=False)
+            microphone_active=False, speaking=False, volume=self.volume,
+            configured_volume=self.volume, volume_available=bool(self.settings_file), volume_pending=False)
         if not self.process:
             return result
         active = self.process.returncode is None
@@ -66,6 +70,7 @@ class Controller:
                         result[key] = heartbeat[key]
             if self.stopping or self.closing:
                 result.update(phase='stopping', ready=False, microphone_active=False)
+            result['volume_pending'] = result['volume'] != self.volume
         else:
             for key in ('finalized', 'usage', 'elapsed_seconds', 'speaker_segments_completed'):
                 if key in heartbeat:
@@ -90,7 +95,9 @@ class Controller:
                 '--wirepod', self.args.wirepod, '--serial', self.args.serial,
                 '--ssh-target', self.args.ssh_target, '--remote-socket', self.args.remote_audio_socket,
                 '--key-file', self.args.key_file, '--seconds', str(self.args.seconds),
-                '--volume', str(self.args.volume), '--status-file', str(self.status_path), '--greet']
+                '--volume', str(self.volume), '--status-file', str(self.status_path), '--greet']
+            if self.settings_file:
+                command += ['--settings-file', self.settings_file]
             if getattr(self.args, 'input_source', 'host') == 'host':
                 command += ['--microphone-name', self.args.microphone_name]
             else:
@@ -145,12 +152,21 @@ class Controller:
     async def handle(self, request):
         if request.path == '/status' and request.method == 'GET':
             return web.json_response(self.status(), headers={'Cache-Control': 'no-store'})
-        if request.path not in ('/start', '/stop') or request.method != 'POST':
+        if request.path not in ('/start', '/stop', '/volume') or request.method != 'POST':
             raise web.HTTPMethodNotAllowed(request.method, ['POST'])
         if request.content_type != 'application/json':
             raise web.HTTPUnsupportedMediaType()
         try:
             body = await request.json()
+            if request.path == '/volume':
+                if not self.settings_file:
+                    raise ValueError('Persistent volume settings are not configured.')
+                if not isinstance(body, dict) or set(body) != {'volume'}:
+                    raise ValueError('Supply only the volume setting.')
+                value = validate_volume(body['volume'])
+                save_volume(self.settings_file, value)
+                self.volume = value
+                return web.json_response({'volume': value, 'saved': True})
             if body != (dict(mode='continuous') if request.path == '/start' else {}):
                 raise ValueError('Invalid fixed control request.')
             if request.path == '/start':
@@ -159,6 +175,8 @@ class Controller:
                 self.request_stop()
         except (ValueError, json.JSONDecodeError) as exc:
             return web.json_response({'error': str(exc)}, status=409)
+        except OSError:
+            return web.json_response({'error': 'Cannot save voice settings.'}, status=503)
         return web.json_response({'action': request.path[1:], 'state': 'pending'}, status=202)
 
 
@@ -242,6 +260,7 @@ if __name__ == '__main__':
     parser.add_argument('--aec-delay-ms', type=int, default=200)
     parser.add_argument('--seconds', type=int, default=600)
     parser.add_argument('--volume', type=int, default=80)
+    parser.add_argument('--settings-file', help='Private persistent operator settings shared with the active child.')
     parser.add_argument('--wirepod', default='http://escapepod.local:8080')
     parser.add_argument('--serial', default='00a14a38')
     parser.add_argument('--ssh-target', default='pi@escapepod.local')
