@@ -22,7 +22,8 @@ from voice_player import VoicePlayer
 from runtime_status import RuntimeStatus
 from host_audio_bridge import HostAudioBridge
 from native_audio_bridge import NativeAudioBridge
-from voice_settings import read_volume
+from voice_settings import read_settings
+from conversation_behaviors import ConversationBehaviors
 
 
 async def conversation(args):
@@ -56,7 +57,13 @@ async def _conversation(args, robot, status, resources):
         if not isinstance(arguments, dict) or arguments:
             raise ValueError('This tool takes no arguments.')
         if name == 'get_robot_status':
-            return await robot.status()
+            return {**await robot.status(), 'conversation_gestures': {
+                'profile': behaviors.mode, 'error': behaviors.error,
+                'animated_eyes_and_blinks_enabled': behaviors.mode != 'off' and not behaviors.error,
+                'head_enabled': behaviors.mode == 'head' and not behaviors.error,
+                'head_currently_permitted': behaviors.safe_head(),
+                'completed_head_nods': behaviors.nods_completed,
+                'driving_available': False}}
         if name == 'get_time':
             return {'time': datetime.now(ZoneInfo('America/New_York')).isoformat(), 'timezone': 'America/New_York'}
         if name == 'end_conversation':
@@ -71,6 +78,7 @@ async def _conversation(args, robot, status, resources):
         ('get_time', 'Get the current local date and time in New York.'),
         ('end_conversation', 'End this paid voice session when the person clearly asks to stop, end the conversation or says goodbye.')]]
     session = LiveVoice(read_key(args.key_file), player.feed, greet=args.greet, tools=tools, tool_handler=tool_handler, input_mode=args.input_mode)
+    behaviors = ConversationBehaviors(robot, player, session)
     active = set()
     capture_lock = asyncio.Lock()
     last_input = time.monotonic()
@@ -81,7 +89,9 @@ async def _conversation(args, robot, status, resources):
         nonlocal failure
         while True:
             try:
-                player.volume = read_volume(args.settings_file, player.volume)
+                settings = read_settings(args.settings_file, player.volume)
+                player.volume, player.boost_db = settings['volume'], settings['boost_db']
+                behaviors.mode = settings['expressions'] if continuous else 'off'
             except (OSError, ValueError):
                 failure = 'Live volume settings are unavailable or invalid.'
                 stop.set()
@@ -92,7 +102,9 @@ async def _conversation(args, robot, status, resources):
             status.write(phase='ready' if ready else 'starting', ready=ready,
                 microphone_active=(host.running and host.frames > 0 and not host.error and (not native or (host.last_native_frame is not None and time.monotonic()-host.last_native_frame < 1))) if host else capture_lock.locked(), speaking=player.clip is not None,
                 input_idle_seconds=round(time.monotonic() - (host.last_activity if host else last_input), 1),
-                speaker_segments_completed=player.segments_played, volume=player.volume)
+                speaker_segments_completed=player.segments_played, volume=player.volume,
+                boost_db=player.boost_db, expressions=behaviors.mode,
+                expressions_state=behaviors.state, expressions_error=behaviors.error)
             await asyncio.sleep(2)
     async def capture(reader, writer):
         nonlocal last_input, failure
@@ -157,6 +169,7 @@ async def _conversation(args, robot, status, resources):
             async for event in stream:
                 if event.event.WhichOneof('event_type') != 'robot_state':
                     continue
+                behaviors.observe(event.event.robot_state)
                 value = event.event.robot_state.touch_data.raw_touch_value
                 if baseline is None:
                     baseline = value
@@ -175,7 +188,9 @@ async def _conversation(args, robot, status, resources):
     try:
         print(json.dumps({'robot': await robot.status()}), flush=True)
         if getattr(args, 'settings_file', None):
-            player.volume = read_volume(args.settings_file, args.volume)
+            settings = read_settings(args.settings_file, args.volume)
+            player.volume, player.boost_db = settings['volume'], settings['boost_db']
+            behaviors.mode = settings['expressions'] if continuous else 'off'
             volume_watch = asyncio.create_task(watch_volume())
         if host:
             # Verify local input and control before opening a paid session.
@@ -193,6 +208,8 @@ async def _conversation(args, robot, status, resources):
             await robot.play_stream(cue(), min(25, player.volume), on_render=host.rendered, on_cancel=host.cancel_render)
         player.task = asyncio.create_task(player.run())
         touch = asyncio.create_task(touch_stop())
+        if continuous:
+            behaviors.task = asyncio.create_task(behaviors.run())
         manager = contextlib.nullcontext(None) if (native or args.local_socket) else tempfile.TemporaryDirectory(prefix='vl-', dir='/private/tmp')
         with manager as directory:
             if not native:
@@ -268,6 +285,7 @@ async def _conversation(args, robot, status, resources):
             except asyncio.TimeoutError:
                 tunnel.kill()
                 await tunnel.wait()
+        await behaviors.close()
         await player.close()
         if host:
             await host.close()
@@ -282,7 +300,10 @@ async def _conversation(args, robot, status, resources):
             status.write(phase='error' if failure else 'closed',
                 ready=False, microphone_active=False, speaking=False,
                 error=failure, finalized=session.finalized.is_set(),
-                usage=session.usage, speaker_segments_completed=player.segments_played)
+                usage=session.usage, speaker_segments_completed=player.segments_played,
+                boost_db=player.boost_db, expressions=behaviors.mode,
+                expressions_state=behaviors.state, expressions_error=behaviors.error,
+                expression_frames=behaviors.frames_sent, head_nods=behaviors.nods_completed)
         if native:
             print(json.dumps({'native_microphone': host.native_stats.report(),
                 'source_clock': host.clock.report() if hasattr(host,'clock') else None,

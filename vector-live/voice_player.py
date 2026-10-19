@@ -7,6 +7,7 @@ import asyncio
 import contextlib
 import math
 import struct
+import numpy as np
 from collections import deque
 from voice_settings import validate_volume
 
@@ -21,6 +22,28 @@ def volume_pcm(pcm, volume):
     return struct.pack('<' + 'h'*len(samples), *(int(sample*volume/100) for sample in samples))
 
 
+def boosted_pcm(pcm, volume, boost_db=0):
+    """Gain followed by a continuous soft knee with a -1 dBFS ceiling.
+
+    No extra buffering. Only peaks above 85% of the ceiling are compressed;
+    ordinary speech below the knee keeps the full requested gain. This is a
+    peak limiter, not loudness normalization or an automatic gain controller.
+    """
+    if boost_db not in (0, 3, 6):
+        raise ValueError('Invalid boost.')
+    if not boost_db or not volume:
+        return volume_pcm(pcm, volume)
+    validate_volume(volume)
+    samples = np.frombuffer(pcm, dtype='<i2').astype(np.float64)
+    samples *= volume / 100 * 10 ** (boost_db / 20)
+    ceiling = 32767 * 10 ** (-1 / 20)
+    knee = ceiling * .85
+    magnitude = np.abs(samples)
+    mask = magnitude > knee
+    magnitude[mask] = knee + (ceiling-knee) * np.tanh((magnitude[mask]-knee)/(ceiling-knee))
+    return (np.sign(samples) * magnitude).astype('<i2').tobytes()
+
+
 def audible(pcm):
     samples = struct.unpack('<' + 'h' * (len(pcm) // 2), pcm)
     return bool(samples) and math.sqrt(sum(s*s for s in samples) / len(samples)) >= 50
@@ -29,6 +52,7 @@ def audible(pcm):
 class VoicePlayer:
     def __init__(self, robot, volume=35, *, control_held=False, on_render=None, on_cancel=None):
         self.robot, self.volume = robot, volume
+        self.boost_db = 0
         self.control_held = control_held
         self.render_options = {} if on_render is None else {'on_render': on_render, 'on_cancel': on_cancel}
         self.queue = asyncio.Queue(maxsize=40)
@@ -85,12 +109,12 @@ class VoicePlayer:
                 if first is None:
                     continue
                 async def frames():
-                    yield volume_pcm(first, self.volume)
+                    yield boosted_pcm(first, self.volume, self.boost_db)
                     while True:
                         frame = await asyncio.wait_for(self.queue.get(), 3)
                         if frame is None:
                             return
-                        yield volume_pcm(frame, self.volume)
+                        yield boosted_pcm(frame, self.volume, self.boost_db)
                 async def play():
                     async with (contextlib.nullcontext() if self.control_held else self.robot.control()):
                         # Fixed stream gain lets each queued PCM frame use the

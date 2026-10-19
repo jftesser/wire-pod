@@ -19,6 +19,7 @@
   .volume-label {display:flex;justify-content:space-between;gap:16px;margin-bottom:12px}
   input[type=range] {width:100%;accent-color:#b0edda;cursor:pointer;min-height:32px;margin:0}
   .range-labels {display:flex;justify-content:space-between;color:#9dafaa;font-size:.85rem}
+  select {font:inherit;background:#151b1d;color:#edf4f1;padding:10px;border:1px solid #668b81;border-radius:8px;width:100%;margin:8px 0 16px}
   .note {font-size:.9rem} @media(max-width:500px){body{padding:16px}.facts{grid-template-columns:1fr}}
 </style>
 <a href="/">← Wire-Pod</a>
@@ -43,6 +44,17 @@
   <p id="volume-note" class="note" role="status">Checking volume controls…</p>
 </section>
 <section class="panel">
+  <h2>Live voice and expressions</h2>
+  <label for="boost">Extra speech boost</label>
+  <select id="boost" disabled><option value="0">Off</option><option value="3">+3 dB · moderate</option><option value="6">+6 dB · stronger</option></select>
+  <p class="note">A soft limiter controls loud peaks. Volume zero still mutes. This affects continuous Live speech.</p>
+  <label for="expressions">Conversation expressions</label>
+  <select id="expressions" disabled><option value="off">Off · ordinary eyes</option><option value="eyes">Animated eyes</option><option value="head">Animated eyes + gentle head nods</option></select>
+  <p id="expression-state" class="note">Checking expressions…</p>
+  <p class="note">Head gestures pause if Vector is lifted, moving, near a detected cliff, or lacks fresh robot state. Walking and lift gestures are still to come.</p>
+  <p id="options-note" class="note" role="status"></p>
+</section>
+<section class="panel">
   <h2>Continuous conversation</h2>
   <p id="continuous-reason">Checking microphone availability…</p>
   <button id="continuous" disabled>Start continuous listening</button>
@@ -57,6 +69,7 @@
 <script>
 const $ = id => document.getElementById(id);
 let busy = false, latest = null, actionError = '';
+let optionsSaving = false, optionsError = '';
 let volumeTarget = null, volumeSaving = false, volumeTimer = null, volumeError = '';
 async function request(endpoint, body) {
   const options = {signal:AbortSignal.timeout(6000),cache:'no-store'};
@@ -85,6 +98,14 @@ function render(state) {
   $('wake').disabled = busy || active;
   $('stop').disabled = busy || !active;
   $('volume').disabled = !state.volume_available;
+  $('boost').disabled=$('expressions').disabled=!state.volume_available || optionsSaving;
+  if (!optionsSaving) {
+    const configured=state.configured_options || {};
+    $('boost').value=String(configured.boost_db ?? 0);
+    $('expressions').value=configured.expressions || 'off';
+  }
+  $('expression-state').textContent=state.expressions_error || (state.host_active ? 'Current expression: '+(state.expressions_state || 'starting') : 'Expressions are idle while Live voice is off.');
+  $('options-note').textContent=optionsError || (optionsSaving?'Saving…':'Saved settings apply during the current continuous conversation and future sessions.');
   const volume = volumeTarget ?? state.configured_volume ?? state.volume;
   if (Number.isInteger(volume)) {
     $('volume').value = volume;
@@ -100,7 +121,7 @@ async function refresh() {
     $('microphone').textContent=$('speaker').textContent=$('source').textContent=$('elapsed').textContent='Unknown';
     $('message').textContent=error.message;
     $('wake').disabled=$('continuous').disabled=true;
-    $('volume').disabled=true;
+    $('volume').disabled=$('boost').disabled=$('expressions').disabled=true;
     $('stop').disabled=busy;
   }
 }
@@ -135,6 +156,15 @@ $('volume').oninput=()=>{
   clearTimeout(volumeTimer); volumeTimer=setTimeout(saveVolume,250);
 };
 $('volume').onchange=()=>{clearTimeout(volumeTimer);saveVolume();};
+async function saveOptions() {
+  optionsSaving=true; optionsError='';
+  const body={boost_db:Number($('boost').value),expressions:$('expressions').value};
+  if(latest)render(latest);
+  try {await request('options',body);}
+  catch(error){optionsError='Settings were not saved: '+error.message;}
+  finally{optionsSaving=false;await refresh();}
+}
+$('boost').onchange=$('expressions').onchange=saveOptions;
 refresh();setInterval(refresh,2000);
 </script>
 </html>

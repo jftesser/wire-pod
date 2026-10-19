@@ -140,3 +140,38 @@ func TestLiveVolumeValidatesAndForwardsWithoutStartingVoice(t *testing.T) {
 		t.Fatal("invalid volume request reached controller")
 	}
 }
+
+func TestLiveOptionsAreBoundedAndDoNotStartVoice(t *testing.T) {
+	calls := fakeLiveService(t, "inactive")
+	previous := liveHostCall
+	t.Cleanup(func() { liveHostCall = previous })
+	forwarded := 0
+	liveHostCall = func(ctx context.Context, method, action string, body []byte) (map[string]interface{}, error) {
+		if action != "options" || method != "POST" {
+			t.Fatal(action, method)
+		}
+		forwarded++
+		return map[string]interface{}{"saved": true}, nil
+	}
+	for _, body := range []string{`{"boost_db":0}`, `{"boost_db":6,"expressions":"head"}`, `{"expressions":"off"}`} {
+		w := httptest.NewRecorder()
+		handleLiveAdmin(w, controlRequest("POST", "options", body))
+		if w.Code != http.StatusOK {
+			t.Fatal(body, w.Code, w.Body.String())
+		}
+	}
+	for _, body := range []string{`{}`, `{"boost_db":9}`, `{"boost_db":true}`, `{"expressions":"roam"}`, `{"volume":100}`, `{"boost_db":6} {}`} {
+		w := httptest.NewRecorder()
+		handleLiveAdmin(w, controlRequest("POST", "options", body))
+		if w.Code != http.StatusBadRequest {
+			t.Fatal(body, w.Code)
+		}
+	}
+	r := controlRequest("POST", "options", `{"boost_db":6}`)
+	r.Header.Set("Origin", "http://elsewhere.example")
+	w := httptest.NewRecorder()
+	handleLiveAdmin(w, r)
+	if w.Code != http.StatusForbidden || forwarded != 3 || len(*calls) != 0 {
+		t.Fatal("options bypassed validation or started voice")
+	}
+}

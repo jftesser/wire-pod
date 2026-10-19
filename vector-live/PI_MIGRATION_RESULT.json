@@ -132,5 +132,48 @@
     "deployed_invalid_range_status": 400,
     "deployed_cross_origin_status": 403,
     "paid_session_opened_for_volume_checks": false
+  },
+  "speech_and_expressions": {
+    "admin_boost_choices_db": [
+      0,
+      3,
+      6
+    ],
+    "limiter_ceiling_dbfs": -1,
+    "saved_boost_db": 6,
+    "saved_expressions": "head",
+    "owner_volume_preserved": 100,
+    "python_tests_mac": 64,
+    "python_tests_pi": 64,
+    "go_admin_audio_intent_tests": true,
+    "pi_60_seconds_synthetic_pcm_processing_seconds": 0.056,
+    "browser_save_and_controller_restart_verified": true,
+    "wheel_commands_implemented": false,
+    "attended_rehearsal": {
+      "usage_seconds": 87,
+      "finalized": true,
+      "elapsed_seconds": 95,
+      "speaker_segments": 5,
+      "expression_frames": 200,
+      "sdk_completed_four_degree_nods": 3,
+      "error": null,
+      "expressions_error": null,
+      "owner_feedback": "Green eye/blink animations visible; initial4-degree nods not noticed. Voice denied blink/motion despite app-generated gestures.",
+      "followup": "Nods increased to8degrees. Status tool and personality now describe actual enabled automatic eyes/blinks/head and unavailable driving.",
+      "silent_eight_degree_check": {
+        "completed_nods": 1,
+        "error": null,
+        "observed_head_degrees_min": 25.06,
+        "observed_head_degrees_max": 31.45,
+        "paid_session_opened": false
+      },
+      "owner_perceived_volume": "Owner confirmed louder; normal mode restored after test.",
+      "microphone_groups": 884,
+      "microphone_group_discontinuities": 0,
+      "echo_worker_error": null,
+      "final_capability_focused_tests_mac": 14,
+      "final_capability_focused_tests_pi": 14,
+      "eight_degree_nod_owner_visual_confirmation": false
+    }
   }
 }

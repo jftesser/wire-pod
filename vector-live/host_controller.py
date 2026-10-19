@@ -18,7 +18,7 @@ import time
 from pathlib import Path
 
 from aiohttp import web
-from voice_settings import read_volume, save_volume, validate_volume
+from voice_settings import read_settings, save_settings, validate_options
 
 
 class Controller:
@@ -33,7 +33,8 @@ class Controller:
         self.closing = False
         self.spawned_at = None
         self.settings_file = getattr(args, 'settings_file', None)
-        self.volume = read_volume(self.settings_file, args.volume)
+        self.settings = read_settings(self.settings_file, args.volume)
+        self.volume = self.settings['volume']
 
     def status(self):
         native = getattr(self.args, 'input_source', 'host') == 'vector-sdk'
@@ -45,6 +46,8 @@ class Controller:
             source='Vector internal microphones (continuous SDK)' if native else 'Host microphone: ' + (self.args.microphone_name or 'not selected'),
             microphone_active=False, speaking=False, volume=self.volume,
             configured_volume=self.volume, volume_available=bool(self.settings_file), volume_pending=False)
+        result.update(boost_db=self.settings['boost_db'], expressions=self.settings['expressions'],
+                      configured_options=dict(self.settings), expressions_state='off', expressions_error=None)
         if not self.process:
             return result
         active = self.process.returncode is None
@@ -65,7 +68,7 @@ class Controller:
             starting = self.spawned_at is not None and time.monotonic() - self.spawned_at < 7
             result.update(mode='continuous', phase=('starting' if starting else 'unverified') if not heartbeat else heartbeat.get('phase', 'unverified'))
             if heartbeat:
-                for key in ('ready', 'microphone_active', 'speaking', 'elapsed_seconds', 'volume', 'speaker_segments_completed'):
+                for key in ('ready', 'microphone_active', 'speaking', 'elapsed_seconds', 'volume', 'speaker_segments_completed', 'boost_db', 'expressions', 'expressions_state', 'expressions_error'):
                     if key in heartbeat:
                         result[key] = heartbeat[key]
             if self.stopping or self.closing:
@@ -152,21 +155,22 @@ class Controller:
     async def handle(self, request):
         if request.path == '/status' and request.method == 'GET':
             return web.json_response(self.status(), headers={'Cache-Control': 'no-store'})
-        if request.path not in ('/start', '/stop', '/volume') or request.method != 'POST':
+        if request.path not in ('/start', '/stop', '/volume', '/options') or request.method != 'POST':
             raise web.HTTPMethodNotAllowed(request.method, ['POST'])
         if request.content_type != 'application/json':
             raise web.HTTPUnsupportedMediaType()
         try:
             body = await request.json()
-            if request.path == '/volume':
+            if request.path in ('/volume', '/options'):
                 if not self.settings_file:
-                    raise ValueError('Persistent volume settings are not configured.')
-                if not isinstance(body, dict) or set(body) != {'volume'}:
-                    raise ValueError('Supply only the volume setting.')
-                value = validate_volume(body['volume'])
-                save_volume(self.settings_file, value)
-                self.volume = value
-                return web.json_response({'volume': value, 'saved': True})
+                    raise ValueError('Persistent voice settings are not configured.')
+                validate_options(body)
+                if (request.path == '/volume' and set(body) != {'volume'}) or not body:
+                    raise ValueError('Supply the requested voice setting.')
+                save_settings(self.settings_file, body)
+                self.settings = read_settings(self.settings_file)
+                self.volume = self.settings['volume']
+                return web.json_response({**self.settings, 'saved': True})
             if body != (dict(mode='continuous') if request.path == '/start' else {}):
                 raise ValueError('Invalid fixed control request.')
             if request.path == '/start':

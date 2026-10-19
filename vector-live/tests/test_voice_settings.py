@@ -29,3 +29,16 @@ def test_settings_reject_unknown_fields_and_symlink_targets(tmp_path):
     link=tmp_path/'link.json';link.symlink_to(path)
     with pytest.raises(ValueError):save_volume(link,40)
     assert 'command' in path.read_text()
+
+
+def test_options_migrate_old_settings_and_volume_updates_preserve_them(tmp_path):
+    from voice_settings import read_settings, save_settings
+    path=tmp_path/'settings.json'
+    path.write_text('{"volume":100}')
+    assert read_settings(path)==dict(volume=100,boost_db=0,expressions='off')
+    save_settings(path,dict(boost_db=6,expressions='head'))
+    save_volume(path,90)
+    assert read_settings(path)==dict(volume=90,boost_db=6,expressions='head')
+    for changes in ({'boost_db':7},{'boost_db':True},{'expressions':'roam'},{'command':'x'}):
+        with pytest.raises(ValueError):save_settings(path,changes)
+    assert read_settings(path)['volume']==90

@@ -2,8 +2,10 @@ import asyncio
 import contextlib
 import struct
 
+import pytest
+
 from vector_audio import tone_pcm
-from voice_player import VoicePlayer, volume_pcm
+from voice_player import VoicePlayer, volume_pcm, boosted_pcm
 
 
 def test_continuous_silence_never_claims_robot_speaker():
@@ -24,7 +26,8 @@ def test_continuous_silence_never_claims_robot_speaker():
     asyncio.run(check())
 
 
-def test_volume_can_mute_and_change_inside_one_active_stream_with_render_reference():
+@pytest.mark.parametrize('boost_db',[0,6])
+def test_volume_can_mute_and_change_inside_one_active_stream_with_render_reference(boost_db):
     async def check():
         pcm=struct.pack('<4h',-32768,-1000,1000,32767)*400
         assert volume_pcm(pcm,100)==pcm
@@ -39,13 +42,14 @@ def test_volume_can_mute_and_change_inside_one_active_stream_with_render_referen
                     options['on_render'](frame)
                     player.volume=0
         player=VoicePlayer(Robot(),50,control_held=True,on_render=reference.append,on_cancel=lambda:None)
+        player.boost_db=boost_db
         player.put(pcm);player.put(pcm);player.put(None)
         player.task=asyncio.create_task(player.run())
         for _ in range(100):
             if player.segments_played:break
             await asyncio.sleep(.001)
         await player.close()
-        assert len(played)==2 and played[0]==volume_pcm(pcm,50)
+        assert len(played)==2 and played[0]==boosted_pcm(pcm,50,boost_db)
         assert played[1]==bytes(len(pcm))
         assert reference==played  # AEC receives the PCM actually sent, after gain.
     asyncio.run(check())
@@ -79,3 +83,15 @@ def test_shutdown_during_capture_cannot_swallow_cancellation():
         assert not robot.controlled
         assert player.task.done()
     asyncio.run(check())
+
+
+def test_boost_has_linear_headroom_soft_ceiling_and_exact_mute():
+    import numpy as np
+    from voice_player import boosted_pcm
+    samples=np.array([-32768,-20000,-1000,0,1000,20000,32767],dtype='<i2')
+    boosted=np.frombuffer(boosted_pcm(samples.tobytes(),100,6),dtype='<i2')
+    assert boosted[2]==-1995 and boosted[4]==1995
+    assert np.max(np.abs(boosted.astype(int)))<=29204
+    assert np.all(np.diff(boosted.astype(int))>0)
+    assert boosted_pcm(samples.tobytes(),0,6)==bytes(samples.nbytes)
+    assert boosted_pcm(samples.tobytes(),100,0)==samples.tobytes()

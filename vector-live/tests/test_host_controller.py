@@ -103,8 +103,12 @@ def test_pi_controller_serves_local_socket_without_ssh_or_paid_child(monkeypatch
                         async with client.post('http://localhost/volume',json={'volume':value}) as response:
                             assert response.status==200
                             assert (await response.json())['saved']
+                    async with client.post('http://localhost/options',json={'boost_db':6,'expressions':'head'}) as response:
+                        assert response.status==200
                     restored=Controller(args,directory)
                     assert restored.volume==80
+                    assert restored.settings['boost_db']==6 and restored.settings['expressions']=='head'
+                    assert not restored.status()['active']
                     for body in ({'volume':True},{'volume':101},{'volume':2.5},{'volume':50,'mode':'continuous'}):
                         async with client.post('http://localhost/volume',json=body) as response:
                             assert response.status==409

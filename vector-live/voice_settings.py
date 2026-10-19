@@ -11,24 +11,46 @@ def validate_volume(value):
     return value
 
 
-def read_volume(filename, default=80):
+def validate_options(settings):
+    if not isinstance(settings, dict) or set(settings) - {'volume', 'boost_db', 'expressions'}:
+        raise ValueError('Voice settings are invalid.')
+    if 'volume' in settings:
+        validate_volume(settings['volume'])
+    if 'boost_db' in settings and (type(settings['boost_db']) is not int or settings['boost_db'] not in (0, 3, 6)):
+        raise ValueError('Boost must be 0, 3 or 6 dB.')
+    if 'expressions' in settings and settings['expressions'] not in ('off', 'eyes', 'head'):
+        raise ValueError('Expressions must be off, eyes or head.')
+    return settings
+
+
+def read_settings(filename, default=80):
     if not filename:
-        return validate_volume(default)
+        return dict(volume=validate_volume(default), boost_db=0, expressions='off')
     path = Path(filename)
     if path.is_symlink():
         raise ValueError('Voice settings must be a regular private file.')
     if not path.exists():
-        return validate_volume(default)
+        return dict(volume=validate_volume(default), boost_db=0, expressions='off')
     if not path.is_file() or path.stat().st_size > 4096:
         raise ValueError('Voice settings are invalid.')
     settings = json.loads(path.read_text())
-    if not isinstance(settings, dict) or set(settings) != {'volume'}:
-        raise ValueError('Voice settings are invalid.')
-    return validate_volume(settings['volume'])
+    validate_options(settings)
+    if 'volume' not in settings:
+        raise ValueError('Voice settings need volume.')
+    return {'boost_db': 0, 'expressions': 'off', **settings}
+
+
+def read_volume(filename, default=80):
+    return read_settings(filename, default)['volume']
 
 
 def save_volume(filename, value):
-    validate_volume(value)
+    save_settings(filename, {'volume': validate_volume(value)})
+
+
+def save_settings(filename, changes):
+    validate_options(changes)
+    settings = {**read_settings(filename), **changes}
     path = Path(filename)
     if path.is_symlink() or not path.parent.is_dir():
         raise ValueError('Voice settings need a regular file in an existing private directory.')
@@ -36,7 +58,7 @@ def save_volume(filename, value):
     try:
         with tempfile.NamedTemporaryFile(mode='w', dir=path.parent, prefix='.voice-settings-', delete=False) as target:
             temporary = target.name
-            json.dump({'volume': value}, target)
+            json.dump(settings, target)
             target.write('\n')
             target.flush()
             os.fsync(target.fileno())

@@ -14,6 +14,29 @@ overlay. Automatic five-minute rollback is no longer used for this installation;
 Live remains off between explicit starts. Earlier bounded-test restore records
 below describe the development history.
 
+## Speech boost and expressions
+
+The continuous admin has saved **0 / +3 / +6 dB speech boost** and expression
+choices **off / animated eyes / eyes with gentle head nods**. These apply during
+an active session. The existing volume slider still controls mute and attenuation.
+A soft-knee peak limiter caps boosted speech at -1 dBFS. It does not normalize
+all speech to the same loudness. Accepted post-gain speaker samples feed AEC.
+
+The separate behavior coordinator renews short-lived face images at 2.5 fps and
+can nod eight degrees relative to the observed head angle, at most once every
+12 seconds when a speaker segment begins. It requires fresh, stationary robot
+state and suppresses/cancels nods during pickup, falling, cliff detection, pathing,
+wheel movement, control loss, or disabling head gestures. Optional expression
+failures are visible in admin and do not tear down otherwise working voice.
+Stop cancels head actions before releasing SDK control; face images expire.
+
+**Roaming during conversation is an intended next capability.** This coordinator
+currently owns face/head only. A navigation policy can issue bounded wheel
+commands under the same SDK control while native capture continues, with
+collision/cliff/pickup checks, a travel boundary, emergency stop, and motor-noise
+AEC tests. Releasing SDK control to ordinary autonomy is not a proven way to
+combine roaming with this speaker path. No wheel/lift commands are implemented.
+
 ## October19 native Live conversation milestone
 
 The owner confirmed a direct question and follow-up both worked through

@@ -61,11 +61,15 @@ def test_continuous_session_releases_every_resource(monkeypatch, failure, input_
             self.closed = False
             assert options['input_mode'] == 'continuous'
             instances['session'] = self
+            self.tool_handler = options['tool_handler']
         async def start(self):
             assert instances['host'].running
             assert instances['robot'].controlled
             if failure == 'paid_start':
                 raise RuntimeError('offline simulated connection failure')
+            physical = await self.tool_handler('get_robot_status', {})
+            assert physical['conversation_gestures']['animated_eyes_and_blinks_enabled'] is False
+            assert physical['conversation_gestures']['driving_available'] is False
             self.sender = object()
             if instances.get('settings'):
                 save_volume(instances['settings'],0)

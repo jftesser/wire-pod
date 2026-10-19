@@ -218,3 +218,57 @@ and was returned to the owner's80setting. The deployed API rejected101with400
 and an unrelated Origin with403. No paid session or playback was opened for
 these checks. The live-gain and echo-reference behavior has offline coverage;
 perceived level can be checked during the next owner-started conversation.
+
+## Continuous speech boost and initial behavior layer
+
+Added saved admin controls for 0/+3/+6 dB boost and off/eyes/eyes-plus-head
+expressions. Volume100 from the owner's settings was preserved. Boost acts on
+PCM before accepted speaker samples enter the echo reference; the soft-knee
+limiter caps peaks at -1 dBFS. There is no new automatic loudness controller.
+The ready cue stays quiet and respects mute.
+
+Expression work runs separately from audio timing. Short-lived 184x96 RGB565
+frames renew at2.5fps; speaker-segment starts can request a eight-degree relative
+nod with a12-second cooldown. Head gestures need fresh stationary robot state
+and stop on pickup/fall/cliff/pathing/wheel movement/control loss or disabling
+head mode. Head actions have bounded RPC deadlines and explicit cancellation.
+Face errors degrade expressions without closing working voice. No wheel/lift
+commands are present. Eventual roaming is documented as a navigation policy
+within this coordinator, with a separate motor-noise/obstacle/interruption trial.
+
+Validation before the attended rehearsal:64Python tests passed on Mac and Pi;
+config-ws, preqs and audiotap Go tests passed. Tests include mid-stream boost
+and mute reaching the exact echo reference, old-volume-file migration,
+persistence, pending-head cancellation on pickup and mode change, and session
+cleanup. On the Pi, processing60seconds of synthetic PCM with+6dB took0.056s.
+The deployed API rejected boost9, unsupported roaming and foreign Origin.
+In the actual admin page, +6dB and head expressions saved successfully, survived
+an unpaid-controller restart and page reload, and retained volume100. An
+independent95-second Pi timer bounds the owner-approved hardware rehearsal.
+
+Backups are in `/home/pi/vector-native-backups/20261019-before-expressions`.
+The active robot firmware, original installation and API key were untouched.
+
+The attended rehearsal closed cleanly:87seconds final usage,95seconds elapsed,
+five completed speaker segments,200face frames, three SDK-completed four-degree
+nods and no voice/expression error. The owner saw green eyes/blinks but did not
+notice the small nods. Nods were increased to eight degrees; a separate silent
+SDK-control check completed one nod without error, and fresh robot state
+measured the head moving from31.45to25.06degrees. This opens no cloud session.
+
+The voice claimed it could not move or blink despite automatic app gestures.
+The existing personality required tool-established physical capability; it now
+explicitly describes automatic eyes/blinks/head and delegates physical questions
+to `get_robot_status`, which returns the current applied profile, eye/blink and
+head enablement, current head permission, completed nod count, and unavailable
+driving. No spoken driving or explicit blink/nod tool is implied. The final
+capability change passes14focused lifecycle/Live configuration tests; visible
+prompt adherence still requires a new conversation. No second paid conversation
+was opened for that adjustment.
+
+The owner confirmed Live voice was louder and Vector returned to normal mode.
+Native transport delivered884groups with zero discontinuities and no echo-worker
+error. The larger silent nod is established by SDK completion and measured head
+angle; the owner did not separately confirm seeing it. Final blink/head status
+and session configuration changes passed14focused tests on both Mac and Pi.
+Live remains off; saved settings are volume100,+6dB,eyes-plus-head.

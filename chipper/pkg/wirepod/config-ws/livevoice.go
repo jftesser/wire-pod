@@ -138,7 +138,7 @@ func handleLiveAdmin(w http.ResponseWriter, r *http.Request) {
 		liveJSON(w, http.StatusOK, status)
 		return
 	}
-	if endpoint != "start" && endpoint != "stop" && endpoint != "volume" {
+	if endpoint != "start" && endpoint != "stop" && endpoint != "volume" && endpoint != "options" {
 		http.NotFound(w, r)
 		return
 	}
@@ -153,6 +153,37 @@ func handleLiveAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 	if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
 		liveJSON(w, http.StatusUnsupportedMediaType, map[string]string{"error": "Expected JSON."})
+		return
+	}
+	if endpoint == "options" {
+		var body struct {
+			Boost       *int    `json:"boost_db"`
+			Expressions *string `json:"expressions"`
+		}
+		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&body); err != nil || (body.Boost == nil && body.Expressions == nil) ||
+			(body.Boost != nil && *body.Boost != 0 && *body.Boost != 3 && *body.Boost != 6) ||
+			(body.Expressions != nil && *body.Expressions != "off" && *body.Expressions != "eyes" && *body.Expressions != "head") || decoder.Decode(&struct{}{}) != io.EOF {
+			liveJSON(w, http.StatusBadRequest, map[string]string{"error": "Choose boost 0, 3 or 6 dB and expressions off, eyes or head."})
+			return
+		}
+		payload := map[string]interface{}{}
+		if body.Boost != nil {
+			payload["boost_db"] = *body.Boost
+		}
+		if body.Expressions != nil {
+			payload["expressions"] = *body.Expressions
+		}
+		raw, _ := json.Marshal(payload)
+		liveMutationLock.Lock()
+		defer liveMutationLock.Unlock()
+		result, err := liveHostCall(ctx, http.MethodPost, "options", raw)
+		if err != nil {
+			liveJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "Voice options could not be saved."})
+			return
+		}
+		liveJSON(w, http.StatusOK, result)
 		return
 	}
 	if endpoint == "volume" {
