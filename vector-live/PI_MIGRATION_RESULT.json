@@ -1,5 +1,5 @@
 {
-  "updated_utc": "2026-10-19T21:49:49.829814+00:00",
+  "updated_utc": "2026-10-19T22:39:58.216635+00:00",
   "state": "Pi deployment and saved continuous volume controls active",
   "backend_host": "Pi",
   "mac_audio_or_cloud_dependency": false,
@@ -284,5 +284,25 @@
     "spoken_expression_tool_selection": "owner-present trial pending",
     "wheel_and_lift_tracks_enabled": false,
     "api_key_or_native_microphone_binaries_changed": false
+  },
+  "voice_selection": {
+    "preferred_saved_name": "Vector",
+    "fallback": "stone",
+    "inventory_match_count": 0,
+    "api_acceptance_probe": {
+      "selected_voice": "Stone",
+      "started": true,
+      "finalized": true,
+      "usage_seconds": 0.0,
+      "error": null,
+      "microphone": false,
+      "audible_playback": false
+    },
+    "offline_tests": {
+      "Mac": 93,
+      "Pi": 93
+    },
+    "backup": "20261019-before-voice-choice",
+    "speaker_quality_check": "Pending attended conversation"
   }
 }

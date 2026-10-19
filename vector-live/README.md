@@ -120,8 +120,9 @@ Normal wake-command listening limits remain stock. The earlier
 [six-second native capture/rearming tests](NATIVE_MIC_RESULTS.md) are historical;
 the custom continuous feed overcomes those gaps for the SDK path.
 
-This companion adds bounded OpenAI voice conversations to wire-pod. Vector uses
-Marin and a curious, warm, playfully earnest personality. Available input paths
+This companion adds bounded OpenAI voice conversations to wire-pod. Continuous
+sessions prefer the saved custom voice named Vector, with Stone as the fallback,
+and use a curious, warm, playfully earnest personality. Available input paths
 are Vector's wake-word request stream, the custom native continuous SDK feed,
 and an optional explicitly selected host microphone. The native SDK and wake
 paths have passed owner-present spoken rehearsals. The host path remains an

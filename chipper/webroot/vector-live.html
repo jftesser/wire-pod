@@ -68,6 +68,7 @@
 <section class="panel">
   <h2>Continuous conversation</h2>
   <p id="continuous-reason">Checking microphone availability…</p>
+  <p id="voice-choice" class="note">Checking continuous voice selection…</p>
   <button id="continuous" disabled>Start continuous listening</button>
 </section>
 <section class="panel">
@@ -105,6 +106,7 @@ function render(state) {
   $('elapsed').textContent = active?`${Math.floor(state.elapsed_seconds || 0)} seconds connected`:'No live session';
   $('mode-note').textContent = state.error || (active?(continuous?'Speak directly without a wake phrase. The input source shown above stays open while Vector speaks.':'This mode requires “Hey Vector” before each turn.'): 'Live voice is off. Ordinary wire-pod is available.');
   $('continuous-reason').textContent = state.continuous_reason || 'Uses the input source shown by the controller and Vector’s speaker. Keep the controller computer awake.';
+  $('voice-choice').textContent = state.voice_name ? 'Current voice: '+state.voice_name+(state.voice_fallback_reason?' · '+state.voice_fallback_reason:'') : (state.voice_policy || 'Voice selection unavailable.');
   $('continuous').disabled = busy || active || !state.continuous_available;
   $('wake').disabled = busy || active;
   $('stop').disabled = busy || !active;

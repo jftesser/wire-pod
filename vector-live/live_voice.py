@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 
 import aiohttp
+from voice_choice import choose_voice
 
 RATE = 16000
 FRAME = 320  # 10 ms, mono PCM16
@@ -57,7 +58,7 @@ def read_key(filename=None):
     return key
 
 
-def session_config(voice='marin', greet=False, tools=(), input_mode='wake'):
+def session_config(voice='marin', greet=False, tools=(), input_mode='wake', voice_prompt=''):
     if input_mode not in ('wake', 'continuous'):
         raise ValueError('Unknown input mode.')
     listening = (
@@ -66,7 +67,7 @@ def session_config(voice='marin', greet=False, tools=(), input_mode='wake'):
         ' A microphone supplies continuous room audio, including while you speak. The person can speak directly without a wake phrase.'
     ) + ' Do not repeatedly prompt or speak uninvited. Ignore your own speaker echo.'
     config = {
-        'model': 'gpt-live-1', 'instructions': PERSONALITY + listening, 'store': False,
+        'model': 'gpt-live-1', 'instructions': PERSONALITY + listening + (' Voice description: ' + voice_prompt if voice_prompt else ''), 'store': False,
         'audio': {'format': {'type': 'audio/pcm', 'rate': RATE}, 'output': {'voice': voice}},
         'delegation': {'type': 'responses', 'responses': {
             'model': 'gpt-5.4-mini', 'instructions': BACKEND_INSTRUCTIONS,
@@ -97,8 +98,12 @@ class PcmBuffer:
 
 
 class LiveVoice:
-    def __init__(self, key, on_audio, voice='marin', greet=False, tools=(), tool_handler=None, input_mode='wake'):
+    def __init__(self, key, on_audio, voice='marin', greet=False, tools=(), tool_handler=None, input_mode='wake', preferred_voice_name=None):
         self.key, self.on_audio, self.voice = key, on_audio, voice
+        self.preferred_voice_name = preferred_voice_name
+        self.voice_prompt = ''
+        self.voice_label = voice if isinstance(voice, str) else 'Custom voice'
+        self.voice_fallback_reason = None
         self.input = PcmBuffer()
         self.input_mode = input_mode
         self.http = self.ws = self.receiver = self.sender = None
@@ -122,12 +127,15 @@ class LiveVoice:
     async def start(self):
         self.http = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=None, sock_connect=15))
         try:
+            if self.preferred_voice_name:
+                self.voice, self.voice_prompt, self.voice_label, self.voice_fallback_reason = await choose_voice(
+                    self.http, self.key, self.preferred_voice_name, self.voice)
             self.ws = await self.http.ws_connect('wss://api.openai.com/v1/live/sessions',
                 headers={'Authorization': 'Bearer ' + self.key, 'User-Agent': 'Vector Live/0.1'},
                 heartbeat=20, max_msg_size=4 * 1024 * 1024)
             self.key = None
             self.receiver = asyncio.create_task(self.receive())
-            await self.ws.send_json({'type': 'session.start', 'session': session_config(self.voice, self.greet, self.tools, self.input_mode)})
+            await self.ws.send_json({'type': 'session.start', 'session': session_config(self.voice, self.greet, self.tools, self.input_mode, self.voice_prompt)})
             await asyncio.wait_for(self.started.wait(), 25)
             if self.error:
                 raise RuntimeError(self.error)

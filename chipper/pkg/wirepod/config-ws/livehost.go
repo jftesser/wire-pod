@@ -126,7 +126,7 @@ func liveCombinedStatus(ctx context.Context) (map[string]interface{}, error) {
 	rememberHost(active)
 	local["continuous_available"], local["continuous_reason"] = host["continuous_available"], host["continuous_reason"]
 	local["host_active"] = active
-	for _, key := range []string{"configured_volume", "volume_available", "volume_pending", "controller_location", "boost_db", "expressions", "configured_options", "expressions_state", "expressions_error", "nod_depth", "nod_interval", "legacy_animations", "animation_catalog", "animation_error", "last_expression"} {
+	for _, key := range []string{"configured_volume", "volume_available", "volume_pending", "controller_location", "boost_db", "expressions", "configured_options", "expressions_state", "expressions_error", "nod_depth", "nod_interval", "legacy_animations", "animation_catalog", "animation_error", "last_expression", "voice_policy", "voice_name", "voice_fallback_reason"} {
 		if value, ok := host[key]; ok {
 			local[key] = value
 		}

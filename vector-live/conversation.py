@@ -16,6 +16,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from live_voice import LiveVoice, read_key
+from voice_choice import PREFERRED_VOICE, FALLBACK_VOICE
 from tap_observer import read_frame
 from vector_audio import discover, VectorAudio, p, tone_pcm
 from voice_player import VoicePlayer
@@ -93,7 +94,8 @@ async def _conversation(args, robot, status, resources):
             'depth_degrees': {'type': 'integer', 'minimum': 0, 'maximum': 20,
                 'description': 'For nod:0uses saved depth; otherwise2–20degrees. Use0for every other expression.'}},
             'required': ['expression', 'depth_degrees'], 'additionalProperties': False}, 'strict': True})
-    session = LiveVoice(read_key(args.key_file), player.feed, greet=args.greet, tools=tools, tool_handler=tool_handler, input_mode=args.input_mode)
+    session = LiveVoice(read_key(args.key_file), player.feed, voice=FALLBACK_VOICE,
+        preferred_voice_name=PREFERRED_VOICE, greet=args.greet, tools=tools, tool_handler=tool_handler, input_mode=args.input_mode)
     behaviors = ConversationBehaviors(robot, player, session)
     active = set()
     capture_lock = asyncio.Lock()
@@ -121,6 +123,8 @@ async def _conversation(args, robot, status, resources):
                 microphone_active=(host.running and host.frames > 0 and not host.error and (not native or (host.last_native_frame is not None and time.monotonic()-host.last_native_frame < 1))) if host else capture_lock.locked(), speaking=player.clip is not None,
                 input_idle_seconds=round(time.monotonic() - (host.last_activity if host else last_input), 1),
                 speaker_segments_completed=player.segments_played, volume=player.volume,
+                voice_name=getattr(session, 'voice_label', None) if ready else None,
+                voice_fallback_reason=getattr(session, 'voice_fallback_reason', None) if ready else None,
                 boost_db=player.boost_db, expressions=behaviors.mode,
                 expressions_state=behaviors.state, expressions_error=behaviors.error, **behaviors.capabilities())
             await asyncio.sleep(2)

@@ -183,6 +183,26 @@ Corrected audible voice quality and spoken exit remain an owner-present check;
 no additional audible test is started without a current readiness response.
 
 
+## Continuous voice selection
+
+New sessions query the approved key's `/v1/audio/voices` inventory for the saved
+name Vector (case insensitive). The newest matching saved voice is selected by
+ID, with its original voice description included in the Live instructions as
+recommended in the [custom voice guide](https://developers.openai.com/api/docs/guides/custom-voices).
+If no match is visible, or inventory access is unavailable (403/404), sessions
+use Stone. Authentication, rate-limit, server and malformed-inventory failures
+remain explicit errors. No voice is created or key changed. Selection is fixed
+for the session; the next Start checks again. The admin shows the policy while
+idle and the selected voice plus fallback reason while ready.
+
+On October19 the Pi's existing key returned an empty saved-voice list, so the
+generated Vector voice could not be selected. A silent API-only probe accepted
+Stone, closed with final usage of0seconds and no error, and opened no robot
+control, microphone or playback. This verifies API acceptance; speaker quality
+still needs an attended conversation.93Python tests passed on Mac and Pi; the Go admin,
+intent and audio-tap tests passed on Pi. Existing volume100, boost6dB and gesture
+settings are preserved. Backup: `20261019-before-voice-choice`.
+
 ## Saved continuous voice volume
 
 The web admin now includes a0–100continuous voice slider. The controller saves
