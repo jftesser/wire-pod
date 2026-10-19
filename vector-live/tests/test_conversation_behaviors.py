@@ -92,3 +92,19 @@ def test_pickup_or_disabled_expressions_cancel_pending_head_action_promptly():
         await behavior.close()
         assert behavior.nods_completed==0
     for disable in (False,True):asyncio.run(check(disable))
+
+
+def test_custom_nod_depth_clamps_travel_and_restores_observed_pose():
+    async def check():
+        requests=[]
+        class Stub:
+            async def SetHeadAngle(self,request,timeout):
+                requests.append(request);return NS(result=NS(code=0))
+        behavior=ConversationBehaviors(NS(stub=Stub(),control_error=None),NS(clip=None),NS(backend_pending=set()))
+        behavior.mode='head';behavior.nod_depth=20
+        observed=state();observed.head_angle_rad=math.radians(-15);behavior.observe(observed)
+        assert await behavior.nod()
+        assert math.isclose(requests[0].angle_rad,math.radians(-22),abs_tol=1e-6)
+        assert math.isclose(requests[1].angle_rad,math.radians(-15),abs_tol=1e-6)
+        await behavior.close()
+    asyncio.run(check())

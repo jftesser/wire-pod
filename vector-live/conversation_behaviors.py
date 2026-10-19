@@ -11,6 +11,7 @@ import time
 import numpy as np
 from PIL import Image, ImageDraw
 from vector_audio import p
+from legacy_animations import catalog, CANCEL_ANIMATION
 
 UNSAFE = sum(p.RobotStatus.Value(name) for name in (
     'ROBOT_STATUS_IS_PICKED_UP', 'ROBOT_STATUS_IS_FALLING',
@@ -41,6 +42,16 @@ class ConversationBehaviors:
     def __init__(self, robot, player, session):
         self.robot, self.player, self.session = robot, player, session
         self.mode = 'off'
+        self.nod_depth, self.nod_interval = 8, 12
+        self.legacy_enabled = False
+        self.available_animations = set()
+        self.legacy_error = None
+        self.catalog_checked = False
+        self.clips = catalog()
+        self.gesture = None
+        self.gesture_uses_head = False
+        self.animation_name = None
+        self.last_expression = None
         self.state = 'off'
         self.error = None
         self.task = self.head = None
@@ -70,10 +81,13 @@ class ConversationBehaviors:
             await asyncio.gather(self.head, return_exceptions=True)
             self.head = None
 
-    async def nod(self):
+    async def nod(self, depth=None):
+        depth = self.nod_depth if depth is None else depth
+        if type(depth) is not int or not 2 <= depth <= 20:
+            raise ValueError('Nod depth must be2–20degrees.')
         original = self.observed.head_angle_rad
         # Nod down from the observed pose, then return; never re-home the head.
-        target = max(math.radians(-22), min(math.radians(45), original-math.radians(8)))
+        target = max(math.radians(-22), min(math.radians(45), original-math.radians(depth)))
         try:
             for angle in (target, original):
                 if not self.safe_head():
@@ -88,6 +102,7 @@ class ConversationBehaviors:
                     raise RuntimeError('Head action did not complete.')
                 self.active_tag = None
             self.nods_completed += 1
+            return True
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -98,6 +113,113 @@ class ConversationBehaviors:
                     await self.robot.stub.CancelActionByIdTag(p.CancelActionByIdTagRequest(id_tag=self.active_tag), timeout=.5)
                 self.active_tag = None
 
+    async def load_animations(self):
+        self.catalog_checked = True
+        self.animation_name = 'preflight'
+        self.gesture_uses_head = False
+        try:
+            await self.cancel_head()
+            # ListAnimations times out, and the engine can report complete for
+            # a missing clip. Probe a known quiet FACE-ONLY clip and reject an
+            # implausibly short result. Never fall back to original noisy clips.
+            # The gateway's completion channel is shared with ordinary behavior.
+            # Let control-grant cancellations drain before the first probe.
+            await asyncio.sleep(.8)
+            probe = self.clips['happy']
+            started = time.monotonic()
+            response = await self.robot.stub.PlayAnimation(p.PlayAnimationRequest(
+                animation=p.Animation(name=probe['name']), loops=1,
+                ignore_body_track=True, ignore_head_track=True, ignore_lift_track=True), timeout=probe['duration_ms']/1000+1.5)
+            if response.result != p.BEHAVIOR_COMPLETE_STATE or response.animation.name != probe['name'] or time.monotonic()-started < probe['duration_ms']/1000*.7:
+                raise RuntimeError('Quiet animation preflight did not complete plausibly.')
+            self.available_animations = set(self.clips)
+            self.legacy_error = None
+        except Exception:
+            self.available_animations = set()
+            self.legacy_error = 'Quiet legacy assets are unavailable.'
+        finally:
+            self.animation_name = None
+
+    def capabilities(self):
+        return dict(nod_depth=self.nod_depth, nod_interval=self.nod_interval,
+            legacy_animations=self.legacy_enabled, animation_catalog=sorted(self.available_animations),
+            animation_error=self.legacy_error, last_expression=self.last_expression)
+
+    def start_expression(self, name, depth=0):
+        if name not in ('nod', 'blink', *self.clips) or type(depth) is not int or not 0 <= depth <= 20 or depth == 1:
+            raise ValueError('Choose a known expression and nod depth0or2–20.')
+        if name != 'nod' and depth != 0:
+            raise ValueError('Depth applies only to nods.')
+        if self.mode == 'off' or self.error or getattr(self.robot, 'control_error', None):
+            raise ValueError('Conversation expressions are disabled or unavailable.')
+        if self.animation_name or (self.gesture and not self.gesture.done()):
+            raise ValueError('An expression or its preflight is already running.')
+        if name == 'nod' and not self.safe_head():
+            raise ValueError('Fresh robot state does not permit a head gesture.')
+        if name not in ('nod', 'blink') and (not self.legacy_enabled or name not in self.available_animations):
+            raise ValueError('This quiet legacy expression is disabled or unavailable.')
+        self.gesture_uses_head = name == 'nod' or (name != 'blink' and self.safe_head())
+        self.last_expression = dict(name=name, status='running', head_tracks=self.gesture_uses_head)
+        self.gesture = asyncio.create_task(self._expression(name, depth))
+        return self.gesture
+
+    async def stop_native_animation(self):
+        # PlayAnimation actions are assigned internal engine tags, not SDK tags.
+        # Queueing the face-only cancellation clip NOW cancels the old action.
+        with contextlib.suppress(Exception):
+            await self.robot.stub.PlayAnimation(p.PlayAnimationRequest(
+                animation=p.Animation(name=CANCEL_ANIMATION), loops=1,
+                ignore_body_track=True, ignore_head_track=True, ignore_lift_track=True), timeout=.6)
+        if self.gesture_uses_head:
+            with contextlib.suppress(Exception):
+                await self.robot.stub.StopAllMotors(p.StopAllMotorsRequest(), timeout=.5)
+
+    async def _expression(self, name, depth):
+        native = name not in ('nod', 'blink')
+        completed = False
+        error = None
+        try:
+            await self.cancel_head()
+            if name == 'nod':
+                completed = bool(await self.nod(depth or self.nod_depth))
+            elif name == 'blink':
+                self.animation_name = name
+                await self.robot.stub.DisplayFaceImageRGB(p.DisplayFaceImageRGBRequest(
+                    face_data=FRAMES['listening', True, False], duration_ms=200, interrupt_running=True), timeout=.6)
+                await asyncio.sleep(.18)
+                completed = True
+            else:
+                self.animation_name = name
+                clip = self.clips[name]
+                started = time.monotonic()
+                response = await self.robot.stub.PlayAnimation(p.PlayAnimationRequest(
+                    animation=p.Animation(name=clip['name']), loops=1,
+                    ignore_body_track=True, ignore_lift_track=True,
+                    ignore_head_track=not self.gesture_uses_head), timeout=clip['duration_ms']/1000+1.5)
+                completed = (response.result == p.BEHAVIOR_COMPLETE_STATE and response.animation.name == clip['name']
+                    and time.monotonic()-started >= clip['duration_ms']/1000*.7
+                    and (not self.gesture_uses_head or self.safe_head()))
+                if not completed:
+                    self.available_animations.discard(name)
+                    error = 'Robot did not complete the animation.'
+        except asyncio.CancelledError:
+            error = 'Expression cancelled.'
+            raise
+        except Exception:
+            error = 'Expression playback failed.'
+        finally:
+            if native and not completed:
+                await self.stop_native_animation()
+            self.animation_name = None
+            self.last_expression = dict(name=name, status='completed' if completed else 'cancelled' if error == 'Expression cancelled.' else 'failed',
+                head_tracks=self.gesture_uses_head, error=error)
+        return self.last_expression
+
+    async def cancel_expression(self):
+        if self.gesture and not self.gesture.done():
+            self.gesture.cancel()
+            await asyncio.gather(self.gesture, return_exceptions=True)
+
     async def run(self):
         previous = None
         next_frame = 0
@@ -105,6 +227,13 @@ class ConversationBehaviors:
         try:
             while True:
                 now = time.monotonic()
+                if self.gesture and not self.gesture.done() and (
+                    self.mode == 'off' or getattr(self.robot, 'control_error', None)
+                    or (self.gesture_uses_head and not self.safe_head())
+                    or (self.animation_name in self.clips and not self.legacy_enabled)):
+                    await self.cancel_expression()
+                if self.legacy_enabled and self.mode != 'off' and not self.catalog_checked and not self.head and not self.player.clip and not (self.gesture and not self.gesture.done()):
+                    await self.load_animations()
                 if self.head and (self.head.done() or not self.safe_head()):
                     await self.cancel_head()
                 if self.mode == 'off' or self.error or getattr(self.robot, 'control_error', None):
@@ -114,9 +243,13 @@ class ConversationBehaviors:
                     state = ('speaking' if self.player.clip is not None else
                              'thinking' if self.session.backend_pending else 'listening')
                     self.state = state
-                    if state == 'speaking' and previous != state and now-self.last_nod >= 12 and self.safe_head() and not self.head:
+                    if state == 'speaking' and previous != state and now-self.last_nod >= self.nod_interval and self.safe_head() and not self.head and not (self.gesture and not self.gesture.done()):
                         self.last_nod = now
                         self.head = asyncio.create_task(self.nod())
+                    if self.animation_name:
+                        previous = None
+                        await asyncio.sleep(.1)
+                        continue
                     if state != previous or now >= next_frame:
                         blink = (now-started) % 4 < .2
                         image = FRAMES[state, blink, int((now-started)*2.5)%2 == 1]
@@ -131,11 +264,13 @@ class ConversationBehaviors:
         except Exception:
             self.error, self.state = 'Face expressions unavailable.', 'degraded'
         finally:
+            await self.cancel_expression()
             await self.cancel_head()
             # Face images expire in <=700 ms; releasing SDK control restores
             # ordinary eyes. Never send another motor command during cleanup.
 
     async def close(self):
+        await self.cancel_expression()
         if self.task:
             self.task.cancel()
             await asyncio.gather(self.task, return_exceptions=True)

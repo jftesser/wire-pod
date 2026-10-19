@@ -175,5 +175,114 @@
       "final_capability_focused_tests_pi": 14,
       "eight_degree_nod_owner_visual_confirmation": false
     }
+  },
+  "expanded_gesture_controls": {
+    "nod_depth_degrees": [
+      2,
+      20
+    ],
+    "nod_interval_seconds": [
+      4,
+      30
+    ],
+    "saved_nod_depth": 8,
+    "saved_nod_interval": 12,
+    "saved_legacy_enabled": true,
+    "python_tests_mac": 82,
+    "python_tests_pi": 82,
+    "go_admin_audio_intent_tests_passed": true,
+    "source_assets_have_only_face_and_head_tracks": true,
+    "engine_index_preserves_original_entries": true,
+    "browser_settings_persistence_verified": true,
+    "paid_session_opened": false,
+    "silent_face_only_sdk_check": {
+      "paid_session_opened": false,
+      "results": {
+        "happy": {
+          "result": 1,
+          "reported_name": "anim_vectorlive_happy",
+          "expected_ms": 1485,
+          "elapsed_ms": 1699,
+          "motor_tracks_enabled": false
+        },
+        "veryHappy": {
+          "result": 1,
+          "reported_name": "anim_vectorlive_veryHappy",
+          "expected_ms": 3729,
+          "elapsed_ms": 3962,
+          "motor_tracks_enabled": false
+        },
+        "sad": {
+          "result": 1,
+          "reported_name": "anim_vectorlive_sad",
+          "expected_ms": 4290,
+          "elapsed_ms": 4495,
+          "motor_tracks_enabled": false
+        },
+        "verySad": {
+          "result": 1,
+          "reported_name": "anim_vectorlive_sad",
+          "expected_ms": 4290,
+          "elapsed_ms": 4495,
+          "motor_tracks_enabled": false,
+          "alias_of": "anim_feedback_meanwords_01"
+        },
+        "angry": {
+          "result": 1,
+          "reported_name": "anim_vectorlive_angry",
+          "expected_ms": 4950,
+          "elapsed_ms": 5157,
+          "motor_tracks_enabled": false
+        },
+        "frustrated": {
+          "result": 1,
+          "reported_name": "anim_vectorlive_frustrated",
+          "expected_ms": 3894,
+          "elapsed_ms": 4141,
+          "motor_tracks_enabled": false
+        },
+        "dartingEyes": {
+          "result": 1,
+          "reported_name": "anim_vectorlive_dartingEyes",
+          "expected_ms": 5049,
+          "elapsed_ms": 5280,
+          "motor_tracks_enabled": false
+        },
+        "confused": {
+          "result": 1,
+          "reported_name": "anim_vectorlive_confused",
+          "expected_ms": 3927,
+          "elapsed_ms": 4147,
+          "motor_tracks_enabled": false
+        },
+        "thinking": {
+          "result": 1,
+          "reported_name": "anim_vectorlive_thinking",
+          "expected_ms": 4125,
+          "elapsed_ms": 4311,
+          "motor_tracks_enabled": false
+        },
+        "celebrate": {
+          "result": 1,
+          "reported_name": "anim_vectorlive_celebrate",
+          "expected_ms": 2376,
+          "elapsed_ms": 2582,
+          "motor_tracks_enabled": false
+        },
+        "love": {
+          "result": 1,
+          "reported_name": "anim_vectorlive_love",
+          "expected_ms": 3102,
+          "elapsed_ms": 3305,
+          "motor_tracks_enabled": false
+        }
+      }
+    },
+    "sdk_list_animations": "timed out with and without behavior control; not used at runtime",
+    "false_sdk_completion": "observed for unknown clip; guarded by expected name and plausible duration",
+    "live_native_head_and_speech_overlap": "owner-present trial pending",
+    "spoken_expression_tool_selection": "owner-present trial pending",
+    "wheel_and_lift_tracks_enabled": false,
+    "api_key_or_native_microphone_binaries_changed": false
   }
 }

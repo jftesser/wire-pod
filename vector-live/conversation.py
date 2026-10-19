@@ -24,6 +24,8 @@ from host_audio_bridge import HostAudioBridge
 from native_audio_bridge import NativeAudioBridge
 from voice_settings import read_settings
 from conversation_behaviors import ConversationBehaviors
+from legacy_animations import LEGACY_MAP
+from aiohttp import web
 
 
 async def conversation(args):
@@ -54,11 +56,18 @@ async def _conversation(args, robot, status, resources):
                          on_cancel=host.cancel_render if host else None)
     stop = asyncio.Event()
     async def tool_handler(name, arguments):
+        if name == 'perform_expression':
+            if not isinstance(arguments, dict) or set(arguments) != {'expression', 'depth_degrees'}:
+                raise ValueError('Supply expression and depth_degrees.')
+            try:
+                return await behaviors.start_expression(arguments['expression'], arguments['depth_degrees'])
+            except ValueError as exc:
+                return {'status': 'unavailable', 'reason': str(exc)}
         if not isinstance(arguments, dict) or arguments:
             raise ValueError('This tool takes no arguments.')
         if name == 'get_robot_status':
             return {**await robot.status(), 'conversation_gestures': {
-                'profile': behaviors.mode, 'error': behaviors.error,
+                'profile': behaviors.mode, 'error': behaviors.error, **behaviors.capabilities(),
                 'animated_eyes_and_blinks_enabled': behaviors.mode != 'off' and not behaviors.error,
                 'head_enabled': behaviors.mode == 'head' and not behaviors.error,
                 'head_currently_permitted': behaviors.safe_head(),
@@ -77,6 +86,13 @@ async def _conversation(args, robot, status, resources):
         ('get_robot_status', 'Read the actual robot battery, firmware and charger state.'),
         ('get_time', 'Get the current local date and time in New York.'),
         ('end_conversation', 'End this paid voice session when the person clearly asks to stop, end the conversation or says goodbye.')]]
+    tools.append({'type': 'function', 'name': 'perform_expression',
+        'description': 'Perform one real nod, blink or quiet legacy expression. Can accompany speech. Report the actual result; off/unsafe/unavailable requests are refused. Wheels and lift never move.',
+        'parameters': {'type': 'object', 'properties': {
+            'expression': {'type': 'string', 'enum': ['nod', 'blink', *LEGACY_MAP]},
+            'depth_degrees': {'type': 'integer', 'minimum': 0, 'maximum': 20,
+                'description': 'For nod:0uses saved depth; otherwise2–20degrees. Use0for every other expression.'}},
+            'required': ['expression', 'depth_degrees'], 'additionalProperties': False}, 'strict': True})
     session = LiveVoice(read_key(args.key_file), player.feed, greet=args.greet, tools=tools, tool_handler=tool_handler, input_mode=args.input_mode)
     behaviors = ConversationBehaviors(robot, player, session)
     active = set()
@@ -92,6 +108,8 @@ async def _conversation(args, robot, status, resources):
                 settings = read_settings(args.settings_file, player.volume)
                 player.volume, player.boost_db = settings['volume'], settings['boost_db']
                 behaviors.mode = settings['expressions'] if continuous else 'off'
+                behaviors.nod_depth, behaviors.nod_interval = settings['nod_depth'], settings['nod_interval']
+                behaviors.legacy_enabled = settings['legacy_animations']
             except (OSError, ValueError):
                 failure = 'Live volume settings are unavailable or invalid.'
                 stop.set()
@@ -104,7 +122,7 @@ async def _conversation(args, robot, status, resources):
                 input_idle_seconds=round(time.monotonic() - (host.last_activity if host else last_input), 1),
                 speaker_segments_completed=player.segments_played, volume=player.volume,
                 boost_db=player.boost_db, expressions=behaviors.mode,
-                expressions_state=behaviors.state, expressions_error=behaviors.error)
+                expressions_state=behaviors.state, expressions_error=behaviors.error, **behaviors.capabilities())
             await asyncio.sleep(2)
     async def capture(reader, writer):
         nonlocal last_input, failure
@@ -191,6 +209,8 @@ async def _conversation(args, robot, status, resources):
             settings = read_settings(args.settings_file, args.volume)
             player.volume, player.boost_db = settings['volume'], settings['boost_db']
             behaviors.mode = settings['expressions'] if continuous else 'off'
+            behaviors.nod_depth, behaviors.nod_interval = settings['nod_depth'], settings['nod_interval']
+            behaviors.legacy_enabled = settings['legacy_animations']
             volume_watch = asyncio.create_task(watch_volume())
         if host:
             # Verify local input and control before opening a paid session.
@@ -199,6 +219,8 @@ async def _conversation(args, robot, status, resources):
             resources.push_async_callback(host.close)
             if host.error or not host.running:
                 raise RuntimeError(host.error or 'Continuous input failed preflight.')
+        if continuous and behaviors.legacy_enabled and behaviors.mode != 'off' and hasattr(robot.stub, 'PlayAnimation'):
+            await behaviors.load_animations()
         await session.start()
         if status:
             heartbeat = asyncio.create_task(publish_status())
@@ -210,6 +232,27 @@ async def _conversation(args, robot, status, resources):
         touch = asyncio.create_task(touch_stop())
         if continuous:
             behaviors.task = asyncio.create_task(behaviors.run())
+        expression_socket = getattr(args, 'expression_socket', None)
+        if continuous and expression_socket:
+            async def expression_request(request):
+                try:
+                    body = await request.json()
+                    if not isinstance(body, dict) or set(body) != {'expression', 'depth_degrees'}:
+                        raise ValueError('Invalid expression request.')
+                    behaviors.start_expression(body['expression'], body['depth_degrees'])
+                    return web.json_response({'status': 'accepted'}, status=202)
+                except ValueError as exc:
+                    return web.json_response({'error': str(exc)}, status=409)
+            command_app = web.Application(client_max_size=1024)
+            command_app.router.add_post('/expression', expression_request)
+            runner = web.AppRunner(command_app)
+            await runner.setup()
+            resources.push_async_callback(runner.cleanup)
+            socket_path = Path(expression_socket)
+            socket_path.unlink(missing_ok=True)
+            await web.UnixSite(runner, str(socket_path)).start()
+            os.chmod(socket_path, 0o600)
+            resources.callback(lambda: socket_path.unlink(missing_ok=True))
         manager = contextlib.nullcontext(None) if (native or args.local_socket) else tempfile.TemporaryDirectory(prefix='vl-', dir='/private/tmp')
         with manager as directory:
             if not native:
@@ -285,6 +328,8 @@ async def _conversation(args, robot, status, resources):
             except asyncio.TimeoutError:
                 tunnel.kill()
                 await tunnel.wait()
+        if 'runner' in locals():
+            await runner.cleanup()
         await behaviors.close()
         await player.close()
         if host:
@@ -303,7 +348,7 @@ async def _conversation(args, robot, status, resources):
                 usage=session.usage, speaker_segments_completed=player.segments_played,
                 boost_db=player.boost_db, expressions=behaviors.mode,
                 expressions_state=behaviors.state, expressions_error=behaviors.error,
-                expression_frames=behaviors.frames_sent, head_nods=behaviors.nods_completed)
+                expression_frames=behaviors.frames_sent, head_nods=behaviors.nods_completed, **behaviors.capabilities())
         if native:
             print(json.dumps({'native_microphone': host.native_stats.report(),
                 'source_clock': host.clock.report() if hasattr(host,'clock') else None,
@@ -334,6 +379,7 @@ if __name__ == '__main__':
     parser.add_argument('--local-socket', help='Run directly on the Pi without an SSH bridge.')
     parser.add_argument('--seconds', type=int, default=180)
     parser.add_argument('--volume', type=int, default=80)
+    parser.add_argument('--expression-socket', help='Private per-session operator expression socket.')
     parser.add_argument('--settings-file', help='Private live operator settings; volume is updated without reopening the session.')
     parser.add_argument('--status-file', help='Private operator-console heartbeat, containing no audio or transcript.')
     parser.add_argument('--audition', action='store_true', help='Use synthetic speech to request a short introduction.')

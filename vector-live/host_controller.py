@@ -17,7 +17,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from aiohttp import web
+from aiohttp import web, ClientSession, UnixConnector
 from voice_settings import read_settings, save_settings, validate_options
 
 
@@ -29,6 +29,7 @@ class Controller:
         self.stop_task = self.log_task = None
         self.lock = asyncio.Lock()
         self.status_path = self.directory / 'session.json'
+        self.expression_socket = self.directory / 'expression.sock'
         self.last_error = None
         self.closing = False
         self.spawned_at = None
@@ -47,7 +48,8 @@ class Controller:
             microphone_active=False, speaking=False, volume=self.volume,
             configured_volume=self.volume, volume_available=bool(self.settings_file), volume_pending=False)
         result.update(boost_db=self.settings['boost_db'], expressions=self.settings['expressions'],
-                      configured_options=dict(self.settings), expressions_state='off', expressions_error=None)
+                      configured_options=dict(self.settings), expressions_state='off', expressions_error=None, nod_depth=self.settings['nod_depth'], nod_interval=self.settings['nod_interval'],
+                      legacy_animations=self.settings['legacy_animations'], animation_catalog=[], animation_error=None, last_expression=None)
         if not self.process:
             return result
         active = self.process.returncode is None
@@ -68,7 +70,7 @@ class Controller:
             starting = self.spawned_at is not None and time.monotonic() - self.spawned_at < 7
             result.update(mode='continuous', phase=('starting' if starting else 'unverified') if not heartbeat else heartbeat.get('phase', 'unverified'))
             if heartbeat:
-                for key in ('ready', 'microphone_active', 'speaking', 'elapsed_seconds', 'volume', 'speaker_segments_completed', 'boost_db', 'expressions', 'expressions_state', 'expressions_error'):
+                for key in ('ready', 'microphone_active', 'speaking', 'elapsed_seconds', 'volume', 'speaker_segments_completed', 'boost_db', 'expressions', 'expressions_state', 'expressions_error', 'nod_depth', 'nod_interval', 'legacy_animations', 'animation_catalog', 'animation_error', 'last_expression'):
                     if key in heartbeat:
                         result[key] = heartbeat[key]
             if self.stopping or self.closing:
@@ -98,7 +100,7 @@ class Controller:
                 '--wirepod', self.args.wirepod, '--serial', self.args.serial,
                 '--ssh-target', self.args.ssh_target, '--remote-socket', self.args.remote_audio_socket,
                 '--key-file', self.args.key_file, '--seconds', str(self.args.seconds),
-                '--volume', str(self.volume), '--status-file', str(self.status_path), '--greet']
+                '--expression-socket', str(self.expression_socket), '--volume', str(self.volume), '--status-file', str(self.status_path), '--greet']
             if self.settings_file:
                 command += ['--settings-file', self.settings_file]
             if getattr(self.args, 'input_source', 'host') == 'host':
@@ -155,12 +157,22 @@ class Controller:
     async def handle(self, request):
         if request.path == '/status' and request.method == 'GET':
             return web.json_response(self.status(), headers={'Cache-Control': 'no-store'})
-        if request.path not in ('/start', '/stop', '/volume', '/options') or request.method != 'POST':
+        if request.path not in ('/start', '/stop', '/volume', '/options', '/expression') or request.method != 'POST':
             raise web.HTTPMethodNotAllowed(request.method, ['POST'])
         if request.content_type != 'application/json':
             raise web.HTTPUnsupportedMediaType()
         try:
             body = await request.json()
+            if request.path == '/expression':
+                state = self.status()
+                if not state['active'] or not state['ready'] or self.stopping or self.closing:
+                    raise ValueError('Start a continuous conversation before auditioning an expression.')
+                if not isinstance(body, dict) or set(body) != {'expression', 'depth_degrees'}:
+                    raise ValueError('Invalid expression request.')
+                async with ClientSession(connector=UnixConnector(path=str(self.expression_socket))) as client:
+                    async with client.post('http://localhost/expression', json=body, timeout=2) as response:
+                        result = await response.json()
+                        return web.json_response(result, status=response.status)
             if request.path in ('/volume', '/options'):
                 if not self.settings_file:
                     raise ValueError('Persistent voice settings are not configured.')
@@ -179,7 +191,7 @@ class Controller:
                 self.request_stop()
         except (ValueError, json.JSONDecodeError) as exc:
             return web.json_response({'error': str(exc)}, status=409)
-        except OSError:
+        except (OSError, asyncio.TimeoutError):
             return web.json_response({'error': 'Cannot save voice settings.'}, status=503)
         return web.json_response({'action': request.path[1:], 'state': 'pending'}, status=202)
 

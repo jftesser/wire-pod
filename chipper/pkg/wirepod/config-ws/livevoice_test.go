@@ -175,3 +175,45 @@ func TestLiveOptionsAreBoundedAndDoNotStartVoice(t *testing.T) {
 		t.Fatal("options bypassed validation or started voice")
 	}
 }
+
+func TestGestureOptionsAndPreviewValidateWithoutStartingSession(t *testing.T) {
+	calls := fakeLiveService(t, "inactive")
+	previous := liveHostCall
+	t.Cleanup(func() { liveHostCall = previous })
+	forwarded := 0
+	liveHostCall = func(ctx context.Context, method, action string, body []byte) (map[string]interface{}, error) {
+		if method != "POST" || (action != "options" && action != "expression") {
+			t.Fatal(method, action)
+		}
+		forwarded++
+		return map[string]interface{}{"status": "accepted"}, nil
+	}
+	for _, test := range []struct {
+		endpoint, body string
+		code           int
+	}{
+		{"options", `{"nod_depth":2,"nod_interval":30,"legacy_animations":false}`, 200},
+		{"options", `{"nod_depth":20,"nod_interval":4,"legacy_animations":true}`, 200},
+		{"options", `{"nod_depth":21}`, 400}, {"options", `{"nod_depth":true}`, 400},
+		{"options", `{"nod_interval":3}`, 400}, {"options", `{"legacy_animations":"true"}`, 400},
+		{"expression", `{"expression":"happy","depth_degrees":0}`, 202},
+		{"expression", `{"expression":"nod","depth_degrees":20}`, 202},
+		{"expression", `{"expression":"nod","depth_degrees":21}`, 400},
+		{"expression", `{"expression":"blink","depth_degrees":8}`, 400},
+		{"expression", `{"expression":"arbitrary","depth_degrees":0}`, 400},
+		{"expression", `{"expression":"happy","depth_degrees":0,"loops":100}`, 400},
+	} {
+		w := httptest.NewRecorder()
+		handleLiveAdmin(w, controlRequest("POST", test.endpoint, test.body))
+		if w.Code != test.code {
+			t.Fatal(test.body, w.Code, w.Body.String())
+		}
+	}
+	r := controlRequest("POST", "expression", `{"expression":"happy","depth_degrees":0}`)
+	r.Header.Set("Origin", "http://elsewhere.example")
+	w := httptest.NewRecorder()
+	handleLiveAdmin(w, r)
+	if w.Code != 403 || forwarded != 4 || len(*calls) != 0 {
+		t.Fatal("gesture mutation bypassed validation or started voice")
+	}
+}

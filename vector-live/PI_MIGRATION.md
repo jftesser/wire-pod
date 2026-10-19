@@ -272,3 +272,62 @@ error. The larger silent nod is established by SDK completion and measured head
 angle; the owner did not separately confirm seeing it. Final blink/head status
 and session configuration changes passed14focused tests on both Mac and Pi.
 Live remains off; saved settings are volume100,+6dB,eyes-plus-head.
+
+## Expanded gesture controls and legacy-expression installation
+
+Added saved nod depth2–20degrees, automatic nod interval4–30seconds, a separate
+legacy-expression switch and a ready-session expression picker. The actual
+`perform_expression` tool accepts nod/blink and the11legacy emotion choices;
+it reports refusal or completion rather than relying on spontaneous nod timing.
+Preview commands use a per-session0600Unix socket, require a fresh matching
+ready child, never spawn paid voice, and are removed during cleanup.
+
+The original legacy clips contain RobotAudio, BodyMotion, LiftHeight and other
+tracks. The deterministic builder retains only ProceduralFace/HeadAngle tracks,
+clamps head angles and records original-member and output SHA256values. Only
+new prefixed assets were installed in the persistent candidate; native microphone
+binaries, pairing, original clips and API credentials were untouched. Root was
+restored read-only. The engine separately loads`assets/anim_manifest.json`; the
+installer merges the new entries into that index while preserving all original
+entries and saves its before-copy under`/data/vector-live-assets/20261019`.
+Both animation and engine services need reloading for the asset/index pair.
+
+The animation reload first waited for its90-second old-process stop timeout,
+then recovered to active. SDK enumeration still timed out with control granted.
+A silent trial caught a completed SDK result for an unknown name; engine logs
+confirmed`AnimationComponent.PlayAnimByName.AnimNotFound`. This exposed the
+missing separate engine-index registration, which was then added. Runtime
+preflight now uses a known quiet face-only clip and rejects implausibly short
+completion. Every expression requires SDK completion and at least70%of the
+authored duration; failed clips are removed from the session catalog.
+
+81Python tests passed on both Mac and Pi. Go admin/audio/intent tests passed.
+Coverage includes original index preservation, stripped-track/hash validation,
+false SDK completion, face arbitration, native cancellation on pickup, explicit
+head depth/travel, private request forwarding, stale-child refusal and cleanup.
+The deployed API rejected nod21and arbitrary animation names; previews were
+refused while Live was off. The browser saved nod14/cadence20, retained them
+after controller restart and reload, then restored the prior nod8/cadence12.
+Volume100and+6dBboost remain as the owner set them.
+
+Backups: `/home/pi/vector-native-backups/20261019-before-gesture-controls`.
+No paid session has been opened for this change. Owner-present native-head
+animation overlap with speech, acoustic echo and spoken-tool selection remain
+separate rehearsal checks.
+
+The gateway uses a shared SDK completion channel. An initial post-grant request
+ended after33ms, while an800mssettling wait produced plausible playback. A stale
+ordinary-animation completion is a possible cause, not a confirmed one. Runtime
+now waits800msbefore preflight and matches the reported animation name as well
+as result/duration. All ten unique quiet clips subsequently completed the
+silent face-only check at plausible authored lengths; verySad aliases sad.
+
+Final validation:82Python tests passed on Mac and Pi. The silent SDK check
+validated all11choices (ten unique clips), matching returned names and plausible
+authored duration with every motor track ignored. Results are recorded in
+`PI_MIGRATION_RESULT.json`. Expression-off suppresses startup probing; enabling
+legacy during a session prepares the catalog when the behavior/speaker slot is
+quiet. The admin leaves nod8/cadence12, legacy enabled, volume100and+6dB.
+No OpenAI session was opened; microphone/ordinary autonomy control was released.
+Legacy-head overlap with Live speech and model-selected tools remain attended
+checks, rather than claims established by the silent face-only run.

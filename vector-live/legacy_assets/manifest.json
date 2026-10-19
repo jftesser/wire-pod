@@ -1,0 +1,191 @@
+{
+  "version": 1,
+  "allowed_tracks": [
+    "HeadAngleKeyFrame",
+    "ProceduralFaceKeyFrame"
+  ],
+  "cancellation": {
+    "name": "anim_vectorlive_cancel",
+    "sha256": "5776d344aa508a6661d7564de27af42509575004535b0a9692edc12501cd0b62"
+  },
+  "expressions": {
+    "happy": {
+      "name": "anim_vectorlive_happy",
+      "duration_ms": 1485,
+      "source_name": "anim_onboarding_reacttoface_happy_01",
+      "source_archive": "anim_onboarding_reacttoface_01.tar",
+      "source_sha256": "2dd16d6a4852aa9b7f082f512fa33c211f74558185c41eb401533c2faf0f058f",
+      "sha256": "830d1a20039429d88afaade4e2f3856195e68364e17c889aae38372d0cb911ab",
+      "tracks": [
+        "HeadAngleKeyFrame",
+        "ProceduralFaceKeyFrame"
+      ]
+    },
+    "veryHappy": {
+      "name": "anim_vectorlive_veryHappy",
+      "duration_ms": 3729,
+      "source_name": "anim_blackjack_victorwin_01",
+      "source_archive": "anim_blackjack_getout_01.tar",
+      "source_sha256": "d2a3f5d58567b11ca97e5bfd86985eb08c5dc9d72182159ee305bbf7712ec6e9",
+      "sha256": "26b4f9d5d2fd5729064afa4ba6f551e7b8abb277259449c1fa6a6ac5c1273946",
+      "tracks": [
+        "HeadAngleKeyFrame",
+        "ProceduralFaceKeyFrame"
+      ]
+    },
+    "sad": {
+      "name": "anim_vectorlive_sad",
+      "duration_ms": 4290,
+      "source_name": "anim_feedback_meanwords_01",
+      "source_archive": "anim_feedback_meanwords_01.tar",
+      "source_sha256": "338a42ac7b1be549c1d5e80cf31ede1b505ce631ca80e0d5d1595d87bd08ffb7",
+      "sha256": "b793fc5580b8b2b23e3facba4d876a8a12891de221b38180f2b7c6d9ab9320cc",
+      "tracks": [
+        "HeadAngleKeyFrame",
+        "ProceduralFaceKeyFrame"
+      ]
+    },
+    "verySad": {
+      "name": "anim_vectorlive_sad",
+      "duration_ms": 4290,
+      "source_name": "anim_feedback_meanwords_01",
+      "source_archive": "anim_feedback_meanwords_01.tar",
+      "source_sha256": "338a42ac7b1be549c1d5e80cf31ede1b505ce631ca80e0d5d1595d87bd08ffb7",
+      "sha256": "b793fc5580b8b2b23e3facba4d876a8a12891de221b38180f2b7c6d9ab9320cc",
+      "tracks": [
+        "HeadAngleKeyFrame",
+        "ProceduralFaceKeyFrame"
+      ]
+    },
+    "angry": {
+      "name": "anim_vectorlive_angry",
+      "duration_ms": 4950,
+      "source_name": "anim_rtpickup_loop_10",
+      "source_archive": "anim_rtpickup_loop_09.tar",
+      "source_sha256": "0774861ad26d1dbe0cea0c31e1adb6a4dc02416760e698ac4d8b40442adac01a",
+      "sha256": "e520a590410bf54e0b489fac51855fec227d1ce78d698b6851d133f8333b65fa",
+      "tracks": [
+        "HeadAngleKeyFrame",
+        "ProceduralFaceKeyFrame"
+      ]
+    },
+    "frustrated": {
+      "name": "anim_vectorlive_frustrated",
+      "duration_ms": 3894,
+      "source_name": "anim_feedback_shutup_01",
+      "source_archive": "anim_feedback_shutup_01.tar",
+      "source_sha256": "6b97e5169d2a7e7a6e990ed9f83fcd1670e578491674a7a9a337a397f9cfd72f",
+      "sha256": "0f8abf15e9f97ff7fc2412d33d252f4bb2d2b9d2a9f0dbd46a0d4efa4c370665",
+      "tracks": [
+        "HeadAngleKeyFrame",
+        "ProceduralFaceKeyFrame"
+      ]
+    },
+    "dartingEyes": {
+      "name": "anim_vectorlive_dartingEyes",
+      "duration_ms": 5049,
+      "source_name": "anim_observing_self_absorbed_01",
+      "source_archive": "anim_observe_oncharger_01.tar",
+      "source_sha256": "6d238cadeec20f69f06acfda3c56ec6c6a13c7601746fdf6eaa8fb351fe99c74",
+      "sha256": "f0a0f57ba9fed0ecca752710c872964be244a91ba430c07893ded53d4873e2f2",
+      "tracks": [
+        "HeadAngleKeyFrame",
+        "ProceduralFaceKeyFrame"
+      ]
+    },
+    "confused": {
+      "name": "anim_vectorlive_confused",
+      "duration_ms": 3927,
+      "source_name": "anim_meetvictor_lookface_timeout_01",
+      "source_archive": "anim_meetvictor_02.tar",
+      "source_sha256": "7775b06cbd3c6c3331235b2fd92df254bcab616485715fd17774d449ac778a88",
+      "sha256": "afd5542cf98ffc3efab430321f37c4e2b67f7f38eb1352f0cc1b9d3d7ef524cd",
+      "tracks": [
+        "HeadAngleKeyFrame",
+        "ProceduralFaceKeyFrame"
+      ]
+    },
+    "thinking": {
+      "name": "anim_vectorlive_thinking",
+      "duration_ms": 4125,
+      "source_name": "anim_explorer_scan_short_04",
+      "source_archive": "anim_explorer_02.tar",
+      "source_sha256": "135d89aec9c10edc25f79db612eb8a270dd621af6ef3f09e6622ff9d5d37837d",
+      "sha256": "6e31477252b01e9d2d24fd1efb41a089d65b5ca75c513143617ae4f3f055ef79",
+      "tracks": [
+        "HeadAngleKeyFrame",
+        "ProceduralFaceKeyFrame"
+      ]
+    },
+    "celebrate": {
+      "name": "anim_vectorlive_celebrate",
+      "duration_ms": 2376,
+      "source_name": "anim_pounce_success_03",
+      "source_archive": "anim_pounce_success_fail_variations.tar",
+      "source_sha256": "ffbd9c1d7ee706a651ebdc8e1b97a7a22f17478469e63e168d7fc712820ae515",
+      "sha256": "08906f67fe1e0634e8fcc553f78854a6902c692eed11593deb5b414aaaf3add9",
+      "tracks": [
+        "HeadAngleKeyFrame",
+        "ProceduralFaceKeyFrame"
+      ]
+    },
+    "love": {
+      "name": "anim_vectorlive_love",
+      "duration_ms": 3102,
+      "source_name": "anim_feedback_iloveyou_02",
+      "source_archive": "anim_feedback_iloveyou_01.tar",
+      "source_sha256": "04e6005a52f5b1e3a7cab10abada6046d10bb32b304deaac94d3be5aaa4b8d28",
+      "sha256": "00c8af9fe1348f2700d9ddb3add16b572ab005496f6f0fa65aabd6f5fa01d265",
+      "tracks": [
+        "HeadAngleKeyFrame",
+        "ProceduralFaceKeyFrame"
+      ]
+    }
+  },
+  "engine_manifest_entries": [
+    {
+      "name": "anim_vectorlive_veryHappy",
+      "length_ms": 3729
+    },
+    {
+      "name": "anim_vectorlive_thinking",
+      "length_ms": 4125
+    },
+    {
+      "name": "anim_vectorlive_love",
+      "length_ms": 3102
+    },
+    {
+      "name": "anim_vectorlive_sad",
+      "length_ms": 4290
+    },
+    {
+      "name": "anim_vectorlive_frustrated",
+      "length_ms": 3894
+    },
+    {
+      "name": "anim_vectorlive_confused",
+      "length_ms": 3927
+    },
+    {
+      "name": "anim_vectorlive_dartingEyes",
+      "length_ms": 5049
+    },
+    {
+      "name": "anim_vectorlive_happy",
+      "length_ms": 1485
+    },
+    {
+      "name": "anim_vectorlive_celebrate",
+      "length_ms": 2376
+    },
+    {
+      "name": "anim_vectorlive_angry",
+      "length_ms": 4950
+    },
+    {
+      "name": "anim_vectorlive_cancel",
+      "length_ms": 33
+    }
+  ]
+}

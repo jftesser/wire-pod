@@ -138,7 +138,7 @@ func handleLiveAdmin(w http.ResponseWriter, r *http.Request) {
 		liveJSON(w, http.StatusOK, status)
 		return
 	}
-	if endpoint != "start" && endpoint != "stop" && endpoint != "volume" && endpoint != "options" {
+	if endpoint != "start" && endpoint != "stop" && endpoint != "volume" && endpoint != "options" && endpoint != "expression" {
 		http.NotFound(w, r)
 		return
 	}
@@ -157,15 +157,20 @@ func handleLiveAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 	if endpoint == "options" {
 		var body struct {
-			Boost       *int    `json:"boost_db"`
-			Expressions *string `json:"expressions"`
+			Boost            *int    `json:"boost_db"`
+			Expressions      *string `json:"expressions"`
+			NodDepth         *int    `json:"nod_depth"`
+			NodInterval      *int    `json:"nod_interval"`
+			LegacyAnimations *bool   `json:"legacy_animations"`
 		}
 		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024))
 		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&body); err != nil || (body.Boost == nil && body.Expressions == nil) ||
+		if err := decoder.Decode(&body); err != nil || (body.Boost == nil && body.Expressions == nil && body.NodDepth == nil && body.NodInterval == nil && body.LegacyAnimations == nil) ||
 			(body.Boost != nil && *body.Boost != 0 && *body.Boost != 3 && *body.Boost != 6) ||
-			(body.Expressions != nil && *body.Expressions != "off" && *body.Expressions != "eyes" && *body.Expressions != "head") || decoder.Decode(&struct{}{}) != io.EOF {
-			liveJSON(w, http.StatusBadRequest, map[string]string{"error": "Choose boost 0, 3 or 6 dB and expressions off, eyes or head."})
+			(body.Expressions != nil && *body.Expressions != "off" && *body.Expressions != "eyes" && *body.Expressions != "head") ||
+			(body.NodDepth != nil && (*body.NodDepth < 2 || *body.NodDepth > 20)) ||
+			(body.NodInterval != nil && (*body.NodInterval < 4 || *body.NodInterval > 30)) || decoder.Decode(&struct{}{}) != io.EOF {
+			liveJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid voice options. Nod depth2–20degrees; interval4–30seconds."})
 			return
 		}
 		payload := map[string]interface{}{}
@@ -174,6 +179,15 @@ func handleLiveAdmin(w http.ResponseWriter, r *http.Request) {
 		}
 		if body.Expressions != nil {
 			payload["expressions"] = *body.Expressions
+		}
+		if body.NodDepth != nil {
+			payload["nod_depth"] = *body.NodDepth
+		}
+		if body.NodInterval != nil {
+			payload["nod_interval"] = *body.NodInterval
+		}
+		if body.LegacyAnimations != nil {
+			payload["legacy_animations"] = *body.LegacyAnimations
 		}
 		raw, _ := json.Marshal(payload)
 		liveMutationLock.Lock()
@@ -184,6 +198,29 @@ func handleLiveAdmin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		liveJSON(w, http.StatusOK, result)
+		return
+	}
+	if endpoint == "expression" {
+		var body struct {
+			Expression string `json:"expression"`
+			Depth      *int   `json:"depth_degrees"`
+		}
+		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024))
+		decoder.DisallowUnknownFields()
+		allowed := map[string]bool{"nod": true, "blink": true, "happy": true, "veryHappy": true, "sad": true, "verySad": true, "angry": true, "frustrated": true, "dartingEyes": true, "confused": true, "thinking": true, "celebrate": true, "love": true}
+		if err := decoder.Decode(&body); err != nil || !allowed[body.Expression] || body.Depth == nil || *body.Depth < 0 || *body.Depth > 20 || *body.Depth == 1 || (body.Expression != "nod" && *body.Depth != 0) || decoder.Decode(&struct{}{}) != io.EOF {
+			liveJSON(w, http.StatusBadRequest, map[string]string{"error": "Choose a listed expression and valid nod depth."})
+			return
+		}
+		raw, _ := json.Marshal(body)
+		liveMutationLock.Lock()
+		defer liveMutationLock.Unlock()
+		result, err := liveHostCall(ctx, http.MethodPost, "expression", raw)
+		if err != nil {
+			liveJSON(w, http.StatusConflict, map[string]string{"error": "Expression unavailable or busy. Check Live readiness, enabled expressions, and robot state."})
+			return
+		}
+		liveJSON(w, http.StatusAccepted, result)
 		return
 	}
 	if endpoint == "volume" {

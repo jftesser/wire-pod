@@ -103,11 +103,14 @@ def test_pi_controller_serves_local_socket_without_ssh_or_paid_child(monkeypatch
                         async with client.post('http://localhost/volume',json={'volume':value}) as response:
                             assert response.status==200
                             assert (await response.json())['saved']
-                    async with client.post('http://localhost/options',json={'boost_db':6,'expressions':'head'}) as response:
+                    async with client.post('http://localhost/options',json={'boost_db':6,'expressions':'head','nod_depth':16,'nod_interval':4,'legacy_animations':True}) as response:
                         assert response.status==200
                     restored=Controller(args,directory)
                     assert restored.volume==80
                     assert restored.settings['boost_db']==6 and restored.settings['expressions']=='head'
+                    assert restored.settings['nod_depth']==16 and restored.settings['nod_interval']==4 and restored.settings['legacy_animations']
+                    async with client.post('http://localhost/expression',json={'expression':'happy','depth_degrees':0}) as response:
+                        assert response.status==409
                     assert not restored.status()['active']
                     for body in ({'volume':True},{'volume':101},{'volume':2.5},{'volume':50,'mode':'continuous'}):
                         async with client.post('http://localhost/volume',json=body) as response:
@@ -119,4 +122,32 @@ def test_pi_controller_serves_local_socket_without_ssh_or_paid_child(monkeypatch
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
             assert not path.exists()
+    asyncio.run(check())
+
+
+def test_expression_preview_forwards_only_to_ready_matching_child_socket(tmp_path):
+    from aiohttp import web
+    async def check():
+        with tempfile.TemporaryDirectory(prefix='vexpr-',dir='/tmp') as directory:
+            controller=Controller(options(),directory)
+            path=Path(directory)
+            received=[]
+            async def expression(request):
+                received.append(await request.json())
+                return web.json_response({'status':'accepted'},status=202)
+            child=web.Application();child.router.add_post('/expression',expression)
+            runner=web.AppRunner(child);await runner.setup()
+            await web.UnixSite(runner,str(controller.expression_socket)).start()
+            class Request:
+                path='/expression';method='POST';content_type='application/json'
+                async def json(self):return {'expression':'happy','depth_degrees':0}
+            try:
+                assert (await controller.handle(Request())).status==409
+                controller.process=SimpleNamespace(pid=456,returncode=None)
+                controller.status_path.write_text(json.dumps(dict(pid=455,heartbeat=time.time(),ready=True,phase='ready')))
+                assert (await controller.handle(Request())).status==409
+                controller.status_path.write_text(json.dumps(dict(pid=456,heartbeat=time.time(),ready=True,phase='ready')))
+                assert (await controller.handle(Request())).status==202
+                assert received==[{'expression':'happy','depth_degrees':0}]
+            finally:await runner.cleanup()
     asyncio.run(check())

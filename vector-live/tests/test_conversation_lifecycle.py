@@ -113,7 +113,7 @@ def test_continuous_session_releases_every_resource(monkeypatch, failure, input_
             args = SimpleNamespace(input_mode='continuous', input_source=input_source, microphone_name='offline fake mic',
                 audio_python='unused', aec_delay_ms=200, status_file=str(path/'status.json'),
                 serial='test', volume=80, wirepod='unused', key_file=None,
-                greet=False, ready_tone=input_source == 'vector-sdk', seconds=.15, local_socket=str(path/'voice.sock'), audition=False)
+                greet=False, ready_tone=input_source == 'vector-sdk', expression_socket=str(path/'expr.sock'), seconds=.15, local_socket=str(path/'voice.sock'), audition=False)
             if failure is None and input_source=='vector-sdk':
                 instances['settings']=str(path/'settings.json')
                 save_volume(instances['settings'],80)
@@ -137,6 +137,7 @@ def test_continuous_session_releases_every_resource(monkeypatch, failure, input_
                 assert state['volume']==0
             assert state['source'] == ('Vector internal microphones (continuous SDK)' if input_source == 'vector-sdk' else 'Host microphone: offline fake mic')
             assert not (path/'voice.sock').exists()
+            assert not (path/'expr.sock').exists()
             assert instances['session'].closed and instances['host'].closed
             assert instances['robot'].closed and not instances['robot'].controlled
     asyncio.run(check())

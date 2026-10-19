@@ -52,6 +52,17 @@
   <select id="expressions" disabled><option value="off">Off · ordinary eyes</option><option value="eyes">Animated eyes</option><option value="head">Animated eyes + gentle head nods</option></select>
   <p id="expression-state" class="note">Checking expressions…</p>
   <p class="note">Head gestures pause if Vector is lifted, moving, near a detected cliff, or lacks fresh robot state. Walking and lift gestures are still to come.</p>
+  <label class="volume-label" for="nod-depth"><strong>Nod depth</strong><output id="nod-depth-value">8°</output></label>
+  <input id="nod-depth" type="range" min="2" max="20" step="1" value="8" disabled>
+  <p class="note">2–20° excursion from the current head pose, limited by available travel.</p>
+  <label for="nod-interval">Automatic nods · minimum interval</label>
+  <select id="nod-interval" disabled><option value="4">4 seconds · lively</option><option value="8">8 seconds</option><option value="12">12 seconds · gentle</option><option value="20">20 seconds</option><option value="30">30 seconds · restrained</option></select>
+  <label><input id="legacy-animations" type="checkbox" disabled> Enable legacy expressions during Live</label>
+  <p class="note">Original eye and optional head tracks. Animation sounds, wheels and lift tracks are removed.</p>
+  <label for="expression-choice">Try an expression during a conversation</label>
+  <select id="expression-choice"><option value="nod">Nod</option><option value="blink">Blink</option><option value="happy">Happy</option><option value="veryHappy">Very happy</option><option value="sad">Sad</option><option value="verySad">Very sad</option><option value="angry">Angry</option><option value="frustrated">Frustrated</option><option value="dartingEyes">Darting eyes</option><option value="confused">Confused</option><option value="thinking">Thinking</option><option value="celebrate">Celebrate</option><option value="love">Love</option></select>
+  <button id="preview-expression" class="secondary" disabled>Try expression</button>
+  <p id="animation-note" class="note" role="status"></p>
   <p id="options-note" class="note" role="status"></p>
 </section>
 <section class="panel">
@@ -69,7 +80,7 @@
 <script>
 const $ = id => document.getElementById(id);
 let busy = false, latest = null, actionError = '';
-let optionsSaving = false, optionsError = '';
+let optionsSaving = false, optionsError = '', nodEditing = false, previewBusy = false;
 let volumeTarget = null, volumeSaving = false, volumeTimer = null, volumeError = '';
 async function request(endpoint, body) {
   const options = {signal:AbortSignal.timeout(6000),cache:'no-store'};
@@ -98,12 +109,22 @@ function render(state) {
   $('wake').disabled = busy || active;
   $('stop').disabled = busy || !active;
   $('volume').disabled = !state.volume_available;
-  $('boost').disabled=$('expressions').disabled=!state.volume_available || optionsSaving;
+  $('boost').disabled=$('expressions').disabled=$('nod-depth').disabled=$('nod-interval').disabled=$('legacy-animations').disabled=!state.volume_available || optionsSaving;
   if (!optionsSaving) {
     const configured=state.configured_options || {};
     $('boost').value=String(configured.boost_db ?? 0);
     $('expressions').value=configured.expressions || 'off';
+    if (!nodEditing) {$('nod-depth').value=configured.nod_depth ?? 8; $('nod-depth-value').textContent=$('nod-depth').value+'°';}
+    const interval=String(configured.nod_interval ?? 12);
+    if (!Array.from($('nod-interval').options).some(option=>option.value===interval)) $('nod-interval').add(new Option(interval+' seconds',interval));
+    $('nod-interval').value=interval;
+    $('legacy-animations').checked=!!configured.legacy_animations;
   }
+  const selected=$('expression-choice').value;
+  const native=!['nod','blink'].includes(selected);
+  const last=state.last_expression;
+  $('preview-expression').disabled=busy || previewBusy || !continuous || !state.ready || state.expressions==='off' || (last && last.status==='running') || (selected==='nod' && state.expressions!=='head') || (native && (!state.legacy_animations || !(state.animation_catalog || []).includes(selected)));
+  $('animation-note').textContent=state.animation_error || (last?`${last.name}: ${last.status}${last.error?' · '+last.error:''}`:state.ready?'Ask for a nod, blink, happy face or other listed expression, or try one here.':'Start continuous listening to try expressions.');
   $('expression-state').textContent=state.expressions_error || (state.host_active ? 'Current expression: '+(state.expressions_state || 'starting') : 'Expressions are idle while Live voice is off.');
   $('options-note').textContent=optionsError || (optionsSaving?'Saving…':'Saved settings apply during the current continuous conversation and future sessions.');
   const volume = volumeTarget ?? state.configured_volume ?? state.volume;
@@ -121,7 +142,7 @@ async function refresh() {
     $('microphone').textContent=$('speaker').textContent=$('source').textContent=$('elapsed').textContent='Unknown';
     $('message').textContent=error.message;
     $('wake').disabled=$('continuous').disabled=true;
-    $('volume').disabled=$('boost').disabled=$('expressions').disabled=true;
+    $('volume').disabled=$('boost').disabled=$('expressions').disabled=$('nod-depth').disabled=$('nod-interval').disabled=$('legacy-animations').disabled=$('preview-expression').disabled=true;
     $('stop').disabled=busy;
   }
 }
@@ -158,13 +179,22 @@ $('volume').oninput=()=>{
 $('volume').onchange=()=>{clearTimeout(volumeTimer);saveVolume();};
 async function saveOptions() {
   optionsSaving=true; optionsError='';
-  const body={boost_db:Number($('boost').value),expressions:$('expressions').value};
+  const body={boost_db:Number($('boost').value),expressions:$('expressions').value,nod_depth:Number($('nod-depth').value),nod_interval:Number($('nod-interval').value),legacy_animations:$('legacy-animations').checked};
   if(latest)render(latest);
   try {await request('options',body);}
   catch(error){optionsError='Settings were not saved: '+error.message;}
   finally{optionsSaving=false;await refresh();}
 }
-$('boost').onchange=$('expressions').onchange=saveOptions;
+$('boost').onchange=$('expressions').onchange=$('nod-interval').onchange=$('legacy-animations').onchange=saveOptions;
+$('nod-depth').oninput=()=>{nodEditing=true;$('nod-depth-value').textContent=$('nod-depth').value+'°';};
+$('nod-depth').onchange=()=>{nodEditing=false;saveOptions();};
+$('expression-choice').onchange=()=>{if(latest)render(latest);};
+$('preview-expression').onclick=async()=>{
+  previewBusy=true;actionError='';if(latest)render(latest);
+  try{await request('expression',{expression:$('expression-choice').value,depth_degrees:0});}
+  catch(error){actionError=error.message;}
+  finally{previewBusy=false;await refresh();}
+};
 refresh();setInterval(refresh,2000);
 </script>
 </html>

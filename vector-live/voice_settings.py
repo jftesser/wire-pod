@@ -12,7 +12,7 @@ def validate_volume(value):
 
 
 def validate_options(settings):
-    if not isinstance(settings, dict) or set(settings) - {'volume', 'boost_db', 'expressions'}:
+    if not isinstance(settings, dict) or set(settings) - {'volume', 'boost_db', 'expressions', 'nod_depth', 'nod_interval', 'legacy_animations'}:
         raise ValueError('Voice settings are invalid.')
     if 'volume' in settings:
         validate_volume(settings['volume'])
@@ -20,24 +20,29 @@ def validate_options(settings):
         raise ValueError('Boost must be 0, 3 or 6 dB.')
     if 'expressions' in settings and settings['expressions'] not in ('off', 'eyes', 'head'):
         raise ValueError('Expressions must be off, eyes or head.')
+    for key, low, high in (('nod_depth', 2, 20), ('nod_interval', 4, 30)):
+        if key in settings and (type(settings[key]) is not int or not low <= settings[key] <= high):
+            raise ValueError(f'{key} must be a whole number from {low} to {high}.')
+    if 'legacy_animations' in settings and type(settings['legacy_animations']) is not bool:
+        raise ValueError('Legacy animations must be on or off.')
     return settings
 
 
 def read_settings(filename, default=80):
     if not filename:
-        return dict(volume=validate_volume(default), boost_db=0, expressions='off')
+        return dict(volume=validate_volume(default), boost_db=0, expressions='off', nod_depth=8, nod_interval=12, legacy_animations=False)
     path = Path(filename)
     if path.is_symlink():
         raise ValueError('Voice settings must be a regular private file.')
     if not path.exists():
-        return dict(volume=validate_volume(default), boost_db=0, expressions='off')
+        return dict(volume=validate_volume(default), boost_db=0, expressions='off', nod_depth=8, nod_interval=12, legacy_animations=False)
     if not path.is_file() or path.stat().st_size > 4096:
         raise ValueError('Voice settings are invalid.')
     settings = json.loads(path.read_text())
     validate_options(settings)
     if 'volume' not in settings:
         raise ValueError('Voice settings need volume.')
-    return {'boost_db': 0, 'expressions': 'off', **settings}
+    return {'boost_db': 0, 'expressions': 'off', 'nod_depth': 8, 'nod_interval': 12, 'legacy_animations': False, **settings}
 
 
 def read_volume(filename, default=80):

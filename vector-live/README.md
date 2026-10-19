@@ -37,6 +37,60 @@ collision/cliff/pickup checks, a travel boundary, emergency stop, and motor-nois
 AEC tests. Releasing SDK control to ordinary autonomy is not a proven way to
 combine roaming with this speaker path. No wheel/lift commands are implemented.
 
+## Configurable gestures and legacy expressions
+
+The Live admin saves **nod depth2–20°**, **automatic nod interval4–30seconds**,
+and a separate legacy-expression switch. Nod depth is an excursion from the
+observed head angle and is clipped to physical head travel. Head mode permits
+head movement; eyes mode keeps native animations face-only. Wheels and lift
+remain disabled. `Try expression` works only during a ready continuous session;
+it never starts paid voice. Actual completion, cancellation or refusal appears
+in the admin status.
+
+The voice backend has a real `perform_expression` function for nod, blink,
+happy, veryHappy, sad, verySad, angry, frustrated, dartingEyes, confused,
+thinking, celebrate and love. A nod can use the saved depth or a requested
+2–20° depth. Spoken performance claims depend on the returned result. Requests
+are serialized without an unbounded queue; pickup, stale state, mode changes,
+control loss and session Stop cancel head-bearing expressions.
+
+Legacy variants retain the original procedural face/head keyframes from the
+same clips mapped by `chipper/pkg/wirepod/ttr/kgsim_cmds.go`. The deterministic
+`build_legacy_assets.py` script strips every other keyframe type, including
+sounds, wheel/lift motions, nested events and backpack lights. It clamps head
+angles to-22°..45°. [The manifest](legacy_assets/manifest.json) records source
+archive/member identities and SHA256values for both original members and quiet
+outputs. These are modified legacy animations, rather than unrestricted playback
+of the original full-body/audio clips.
+
+Only new `anim_vectorlive_*.json` assets are added to the persistent custom
+application tree; original clips and the four native-mic binaries stay intact.
+`firmware/install-quiet-animations.sh` checks hashes and restores root read-only.
+The engine also reads a separate `assets/anim_manifest.json` index. Build with
+`--engine-manifest` pointing to a saved copy of that index; the merge preserves
+all original entries and adds the new names/lengths. Both the animation process
+and engine need reloading after installation. The installer saves the original
+index under `/data/vector-live-assets/20261019/anim_manifest.before.json`; restore
+it and remove only the new prefixed clip files to undo the addition.
+The installer itself never reloads services or plays anything.
+
+The running firmware times out on SDK `ListAnimations`, including with behavior
+control granted. It also returns a completed SDK result for an unknown animation
+name, as confirmed by engine `AnimNotFound` messages during installation. Live
+therefore probes the known quiet happy clip with all motor tracks ignored and
+requires a plausible playback duration (at least70%of the authored length), then
+uses the versioned allowlist. The first probe waits800msafter control grant to reduce stale-completion races.
+Turning expressions off suppresses the probe; enabling legacy during a session
+prepares it when the speaker/gesture slot is quiet.
+Every expression checks the SDK result, reported animation name and duration;
+this rejects immediate false completions and is not a substitute for room testing. A failed clip is removed from the current session's
+available choices. Auto-generated RGB eyes pause while a native clip owns the
+face, then resume. Cancelling a native animation queues the face-only cancellation
+clip NOW; head-bearing cancellation also sends StopAllMotors. No raw legacy-name
+fallback is allowed. Simultaneous native animation and Live speech still needs
+an owner-present acoustic/gesture trial; silent face-only playback can be checked
+without a microphone or cloud session.
+
 ## October19 native Live conversation milestone
 
 The owner confirmed a direct question and follow-up both worked through
