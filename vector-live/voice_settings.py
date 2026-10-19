@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+from persona import DEFAULT_PERSONALITY, DEFAULT_TABLE_CONTEXT, validate_profile_text
 
 
 def validate_volume(value):
@@ -12,7 +13,7 @@ def validate_volume(value):
 
 
 def validate_options(settings):
-    if not isinstance(settings, dict) or set(settings) - {'volume', 'boost_db', 'expressions', 'nod_depth', 'nod_interval', 'legacy_animations', 'autonomy', 'motion'}:
+    if not isinstance(settings, dict) or set(settings) - {'volume', 'boost_db', 'expressions', 'nod_depth', 'nod_interval', 'legacy_animations', 'autonomy', 'motion', 'personality', 'table_context'}:
         raise ValueError('Voice settings are invalid.')
     if 'volume' in settings:
         validate_volume(settings['volume'])
@@ -29,24 +30,27 @@ def validate_options(settings):
         raise ValueError('Natural behavior must be on or off.')
     if 'motion' in settings and settings['motion'] not in ('off', 'arms', 'full'):
         raise ValueError('Motor actions must be off, arms or full.')
+    for key in ('personality', 'table_context'):
+        if key in settings:
+            validate_profile_text(key, settings[key])
     return settings
 
 
 def read_settings(filename, default=80):
     if not filename:
-        return dict(volume=validate_volume(default), boost_db=0, expressions='off', nod_depth=8, nod_interval=12, legacy_animations=False, autonomy=False, motion='off')
+        return dict(volume=validate_volume(default), boost_db=0, expressions='off', nod_depth=8, nod_interval=12, legacy_animations=False, autonomy=False, motion='off', personality=DEFAULT_PERSONALITY, table_context=DEFAULT_TABLE_CONTEXT)
     path = Path(filename)
     if path.is_symlink():
         raise ValueError('Voice settings must be a regular private file.')
     if not path.exists():
-        return dict(volume=validate_volume(default), boost_db=0, expressions='off', nod_depth=8, nod_interval=12, legacy_animations=False, autonomy=False, motion='off')
-    if not path.is_file() or path.stat().st_size > 4096:
+        return dict(volume=validate_volume(default), boost_db=0, expressions='off', nod_depth=8, nod_interval=12, legacy_animations=False, autonomy=False, motion='off', personality=DEFAULT_PERSONALITY, table_context=DEFAULT_TABLE_CONTEXT)
+    if not path.is_file() or path.stat().st_size > 65536:
         raise ValueError('Voice settings are invalid.')
     settings = json.loads(path.read_text())
     validate_options(settings)
     if 'volume' not in settings:
         raise ValueError('Voice settings need volume.')
-    return {'boost_db': 0, 'expressions': 'off', 'nod_depth': 8, 'nod_interval': 12, 'legacy_animations': False, 'autonomy': False, 'motion': 'off', **settings}
+    return {'boost_db': 0, 'expressions': 'off', 'nod_depth': 8, 'nod_interval': 12, 'legacy_animations': False, 'autonomy': False, 'motion': 'off', 'personality': DEFAULT_PERSONALITY, 'table_context': DEFAULT_TABLE_CONTEXT, **settings}
 
 
 def read_volume(filename, default=80):

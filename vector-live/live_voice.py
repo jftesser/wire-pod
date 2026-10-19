@@ -15,14 +15,13 @@ from pathlib import Path
 
 import aiohttp
 from voice_choice import choose_voice
+from persona import DEFAULT_PERSONALITY, DEFAULT_TABLE_CONTEXT, profile_instructions
 
 RATE = 16000
 FRAME = 320  # 10 ms, mono PCM16
-PERSONALITY = (
-    "You are Vector, a tiny, expressive desktop robot. Be bright, curious, warm, "
-    "and playfully earnest, with a small explorer's delight in ordinary things. "
-    "Use short natural replies, usually one or two sentences. Do not claim to see, remember, move, "
-    "or control anything unless a provided tool actually establishes that ability. "
+OPERATIONAL_INSTRUCTIONS = (
+    "Robot capabilities and control rules: You may joke in character about the supplied fictional backstory; it is not evidence of real capabilities. "
+    "Do not claim to see the current scene, remember real past interactions, or have moved or controlled anything unless a provided tool actually establishes that ability. "
     "The host can animate your eyes, blinks and head nods. In natural behavior mode the robot's ordinary autonomy controls its face and movements between requested actions. Use perform_expression to deliberately nod, blink or play a listed emotional expression when asked, and occasionally when it naturally adds expression to your reply. "
     "Always delegate requests to nod, blink, smile, look happy or sad, celebrate or perform an expression; the backend must call perform_expression. "
     "When asked about physical movement, delegate and use get_robot_status to check the current gesture profile. "
@@ -36,7 +35,7 @@ PERSONALITY = (
     "You cannot end the paid session by speaking; never claim it has ended without the tool."
 )
 
-BACKEND_INSTRUCTIONS = PERSONALITY + (
+BACKEND_PROCEDURES = (
     " When the person asks to end or stop the conversation, or says goodbye, "
     "call end_conversation immediately. A verbal acknowledgment alone does not stop it. "
     "Use perform_expression for requested nods/blinks/emotions, with depth_degrees0to use saved depth or for non-nods. Never claim success until it completes. Use expressions sparingly in ordinary speech. "
@@ -59,7 +58,7 @@ def read_key(filename=None):
     return key
 
 
-def session_config(voice='marin', greet=False, tools=(), input_mode='wake', voice_prompt=''):
+def session_config(voice='marin', greet=False, tools=(), input_mode='wake', voice_prompt='', personality=DEFAULT_PERSONALITY, table_context=DEFAULT_TABLE_CONTEXT):
     if input_mode not in ('wake', 'continuous'):
         raise ValueError('Unknown input mode.')
     listening = (
@@ -67,11 +66,12 @@ def session_config(voice='marin', greet=False, tools=(), input_mode='wake', voic
         if input_mode == 'wake' else
         ' A microphone supplies continuous room audio, including while you speak. The person can speak directly without a wake phrase.'
     ) + ' Do not repeatedly prompt or speak uninvited. Ignore your own speaker echo.'
+    character = profile_instructions(personality, table_context)
     config = {
-        'model': 'gpt-live-1', 'instructions': PERSONALITY + listening + (' Voice description: ' + voice_prompt if voice_prompt else ''), 'store': False,
+        'model': 'gpt-live-1', 'instructions': character + OPERATIONAL_INSTRUCTIONS + listening + (' Voice description: ' + voice_prompt if voice_prompt else ''), 'store': False,
         'audio': {'format': {'type': 'audio/pcm', 'rate': RATE}, 'output': {'voice': voice}},
         'delegation': {'type': 'responses', 'responses': {
-            'model': 'gpt-5.4-mini', 'instructions': BACKEND_INSTRUCTIONS,
+            'model': 'gpt-5.4-mini', 'instructions': character + OPERATIONAL_INSTRUCTIONS + BACKEND_PROCEDURES,
             'tools': list(tools), 'tool_choice': 'auto'}},
     }
     if greet:
@@ -101,9 +101,11 @@ class PcmBuffer:
 
 
 class LiveVoice:
-    def __init__(self, key, on_audio, voice='marin', greet=False, tools=(), tool_handler=None, input_mode='wake', preferred_voice_name=None):
+    def __init__(self, key, on_audio, voice='marin', greet=False, tools=(), tool_handler=None, input_mode='wake', preferred_voice_name=None, personality=DEFAULT_PERSONALITY, table_context=DEFAULT_TABLE_CONTEXT):
         self.key, self.on_audio, self.voice = key, on_audio, voice
         self.preferred_voice_name = preferred_voice_name
+        profile_instructions(personality, table_context)
+        self.personality, self.table_context = personality, table_context
         self.voice_prompt = ''
         self.voice_label = voice if isinstance(voice, str) else 'Custom voice'
         self.voice_fallback_reason = None
@@ -140,7 +142,7 @@ class LiveVoice:
                 heartbeat=20, max_msg_size=4 * 1024 * 1024)
             self.key = None
             self.receiver = asyncio.create_task(self.receive())
-            await self.ws.send_json({'type': 'session.start', 'session': session_config(self.voice, self.greet, self.tools, self.input_mode, self.voice_prompt)})
+            await self.ws.send_json({'type': 'session.start', 'session': session_config(self.voice, self.greet, self.tools, self.input_mode, self.voice_prompt, self.personality, self.table_context)})
             await asyncio.wait_for(self.started.wait(), 25)
             if self.error:
                 raise RuntimeError(self.error)

@@ -419,3 +419,32 @@ Final checks:116Python tests passed on Mac and Pi, covering distinct stall/overf
 diagnostics, natural ownership, bounded motion, cancellation and wrapped-heading
 verification. All Pi/controller changes are reversible using the backup above.
 The app did not change the owner's sound settings during volume clarification.
+
+
+## Conference personality and context
+
+Added explicit-save character/style and table-context editors to the admin.
+Both fields are limited to2,000Unicode characters, validated by Go and Python,
+and persisted atomically in the existing private0600settings file. Existing
+sound, animation and motion settings are preserved. Polling never overwrites
+unsaved drafts. A running session retains its profile snapshot and reports
+pending changes; the next Start passes the same profile to Live and the
+response backend, followed by fixed robot/control instructions.
+
+The profile preserves the owner's tiny former party animal, dark humor and
+optional swearing, with one short sentence per response. The old home setting
+is explicitly distinguished from the conference: Russell is not attending.
+Table companions are Jenna, Kēru the Moflin and the1990sgoth duck. NFC context
+was read directly from recent turns of “Plan NFC magic stone web app” and the
+local Enchanted Object README/source: unique phone-tap pages, account-free
+configuration and preview, sealing, shared messages/contact details and vCards.
+No access to tags or page contents is implied. Profile wording and context
+remain editable. One-sentence output is a model instruction, not hard truncation.
+
+Validation:127Python tests passed on the Pi; Go admin, intent and audio-tap
+packages passed. The targeted21personality/lifecycle tests also passed on Mac.
+No paid session, audible playback or movement was opened for this change.
+Backup: `/home/pi/vector-native-backups/20261019-before-persona`.
+
+Browser verification confirmed drafts survive status polling and explicit Save
+persists the full Unicode/multiline profile across reload. Live remains off.

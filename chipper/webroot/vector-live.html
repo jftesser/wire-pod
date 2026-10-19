@@ -20,6 +20,7 @@
   input[type=range] {width:100%;accent-color:#b0edda;cursor:pointer;min-height:32px;margin:0}
   .range-labels {display:flex;justify-content:space-between;color:#9dafaa;font-size:.85rem}
   select {font:inherit;background:#151b1d;color:#edf4f1;padding:10px;border:1px solid #668b81;border-radius:8px;width:100%;margin:8px 0 16px}
+  textarea {box-sizing:border-box;width:100%;font:inherit;line-height:1.5;background:#151b1d;color:#edf4f1;padding:12px;border:1px solid #668b81;border-radius:8px;margin:8px 0 16px;resize:vertical}
   .note {font-size:.9rem} @media(max-width:500px){body{padding:16px}.facts{grid-template-columns:1fr}}
 </style>
 <a href="/">← Wire-Pod</a>
@@ -42,6 +43,16 @@
   <input id="volume" type="range" min="0" max="100" step="1" value="80" disabled aria-describedby="volume-note">
   <div class="range-labels"><span>0 · muted</span><span>100 · loudest</span></div>
   <p id="volume-note" class="note" role="status">Checking volume controls…</p>
+</section>
+<section class="panel">
+  <h2>Personality and table context</h2>
+  <label for="personality">Vector’s personality and speaking style</label>
+  <textarea id="personality" rows="7" maxlength="2000" disabled aria-describedby="profile-note"></textarea>
+  <label for="table-context">People, robots and objects at the table</label>
+  <textarea id="table-context" rows="8" maxlength="2000" disabled aria-describedby="profile-note"></textarea>
+  <p class="note">Up to 2,000 characters each. Save here, then start a new conversation to apply. Robot control limits stay in place.</p>
+  <button id="save-profile" class="secondary" disabled>Save personality and context</button>
+  <p id="profile-note" class="note" role="status">Loading saved personality…</p>
 </section>
 <section class="panel">
   <h2>Live voice and expressions</h2>
@@ -87,6 +98,7 @@
 const $ = id => document.getElementById(id);
 let busy = false, latest = null, actionError = '';
 let optionsSaving = false, optionsError = '', nodEditing = false, previewBusy = false;
+let profileDirty = false, profileSaving = false, profileError = '';
 let volumeTarget = null, volumeSaving = false, volumeTimer = null, volumeError = '';
 async function request(endpoint, body) {
   const options = {signal:AbortSignal.timeout(6000),cache:'no-store'};
@@ -116,6 +128,15 @@ function render(state) {
   $('wake').disabled = busy || active;
   $('stop').disabled = busy || !active;
   $('volume').disabled = !state.volume_available;
+  const profile=state.configured_options || {};
+  const profileAvailable=state.volume_available && typeof profile.personality==='string' && typeof profile.table_context==='string';
+  if (profileAvailable && !profileDirty && !profileSaving) {
+    if ($('personality').value!==profile.personality) $('personality').value=profile.personality;
+    if ($('table-context').value!==profile.table_context) $('table-context').value=profile.table_context;
+  }
+  $('personality').disabled=$('table-context').disabled=!profileAvailable || profileSaving;
+  $('save-profile').disabled=!profileAvailable || profileSaving || !profileDirty;
+  $('profile-note').textContent=profileError || (!profileAvailable?'Personality controls are unavailable.':profileSaving?'Saving…':profileDirty?'Unsaved changes · use Save to keep this draft.':state.profile_pending?'Saved · stop and start the conversation to apply this personality and context.':'Saved · applies when the next conversation starts.');
   $('boost').disabled=$('expressions').disabled=$('nod-depth').disabled=$('nod-interval').disabled=$('legacy-animations').disabled=$('autonomy').disabled=$('motion').disabled=!state.volume_available || optionsSaving;
   if (!optionsSaving) {
     const configured=state.configured_options || {};
@@ -155,6 +176,7 @@ async function refresh() {
     $('message').textContent=error.message;
     $('wake').disabled=$('continuous').disabled=true;
     $('volume').disabled=$('boost').disabled=$('expressions').disabled=$('nod-depth').disabled=$('nod-interval').disabled=$('legacy-animations').disabled=$('preview-expression').disabled=true;
+    $('save-profile').disabled=true;
     $('stop').disabled=busy;
   }
 }
@@ -167,6 +189,14 @@ async function action(endpoint, body) {
 $('wake').onclick=()=>action('start',{mode:'wake'});
 $('continuous').onclick=()=>action('start',{mode:'continuous'});
 $('stop').onclick=()=>action('stop',{});
+$('personality').oninput=$('table-context').oninput=()=>{profileDirty=true;profileError='';if(latest)render(latest);};
+$('save-profile').onclick=async()=>{
+  const body={personality:$('personality').value,table_context:$('table-context').value};
+  profileSaving=true;profileError='';if(latest)render(latest);
+  try {await request('options',body);profileDirty=false;}
+  catch(error){profileError='Personality was not saved: '+error.message;}
+  finally{profileSaving=false;await refresh();}
+};
 async function saveVolume() {
   if (volumeSaving || volumeTarget===null) return;
   const value = volumeTarget;

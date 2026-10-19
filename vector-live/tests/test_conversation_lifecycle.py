@@ -51,6 +51,9 @@ def test_continuous_session_releases_every_resource(monkeypatch, failure, input_
                 self.controlled = False
     class Session:
         def __init__(self, key, on_audio, **options):
+            if instances.get('settings'):
+                assert options['personality']=='Offline test personality'
+                assert options['table_context']=='Offline table with Kēru'
             self.input = PcmBuffer()
             self.sender = None
             self.error = None
@@ -117,7 +120,7 @@ def test_continuous_session_releases_every_resource(monkeypatch, failure, input_
             if failure is None and input_source=='vector-sdk':
                 instances['settings']=str(path/'settings.json')
                 from voice_settings import save_settings
-                save_settings(instances['settings'],dict(volume=80,autonomy=autonomy))
+                save_settings(instances['settings'],dict(volume=80,autonomy=autonomy,personality='Offline test personality',table_context='Offline table with Kēru'))
                 args.settings_file=instances['settings']
             if failure:
                 if failure=='ready_cue' and input_source=='host':

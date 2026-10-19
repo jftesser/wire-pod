@@ -3,6 +3,7 @@ import json
 import pytest
 
 from voice_settings import read_volume, save_volume, validate_volume
+from persona import DEFAULT_PERSONALITY, DEFAULT_TABLE_CONTEXT
 
 
 def test_volume_persists_with_private_permissions_and_preserves_valid_settings(tmp_path):
@@ -35,10 +36,10 @@ def test_options_migrate_old_settings_and_volume_updates_preserve_them(tmp_path)
     from voice_settings import read_settings, save_settings
     path=tmp_path/'settings.json'
     path.write_text('{"volume":100}')
-    assert read_settings(path)==dict(volume=100,boost_db=0,expressions='off',nod_depth=8,nod_interval=12,legacy_animations=False,autonomy=False,motion='off')
+    assert read_settings(path)==dict(volume=100,boost_db=0,expressions='off',nod_depth=8,nod_interval=12,legacy_animations=False,autonomy=False,motion='off',personality=DEFAULT_PERSONALITY,table_context=DEFAULT_TABLE_CONTEXT)
     save_settings(path,dict(boost_db=6,expressions='head'))
     save_volume(path,90)
-    assert read_settings(path)==dict(volume=90,boost_db=6,expressions='head',nod_depth=8,nod_interval=12,legacy_animations=False,autonomy=False,motion='off')
+    assert read_settings(path)==dict(volume=90,boost_db=6,expressions='head',nod_depth=8,nod_interval=12,legacy_animations=False,autonomy=False,motion='off',personality=DEFAULT_PERSONALITY,table_context=DEFAULT_TABLE_CONTEXT)
     for changes in ({'boost_db':7},{'boost_db':True},{'expressions':'roam'},{'command':'x'},{'autonomy':1},{'motion':'roam'}):
         with pytest.raises(ValueError):save_settings(path,changes)
     assert read_settings(path)['volume']==90

@@ -1,5 +1,5 @@
 {
-  "updated_utc": "2026-10-19T23:20:39.603863+00:00",
+  "updated_utc": "2026-10-19T23:28:58.465819+00:00",
   "state": "Pi continuous voice with natural behavior and bounded requested motor actions",
   "backend_host": "Pi",
   "mac_audio_or_cloud_dependency": false,
@@ -379,5 +379,21 @@
       "proves_extended_spoken_quality": false
     },
     "sound_settings_changed_by_app_during_clarification": false
+  },
+  "editable_conference_profile": {
+    "deployed": true,
+    "python_tests_pi": 127,
+    "targeted_mac_tests": 21,
+    "go_admin_intent_audio_tests": "passed",
+    "browser_draft_survives_polling": true,
+    "browser_save_reload_verified": true,
+    "profile_applies": "next Start",
+    "other_settings_preserved": true,
+    "nfc_source": "Recent turns of Plan NFC magic stone web app and local Enchanted Object README/source",
+    "russell_attending": false,
+    "paid_session_opened": false,
+    "audible_playback": false,
+    "live_off_after_validation": true,
+    "backup": "20261019-before-persona"
   }
 }

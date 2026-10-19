@@ -18,6 +18,25 @@ def options():
         remote_audio_socket='/private/socket', key_file='/unused/env', seconds=600, volume=80)
 
 
+def test_profile_edits_are_pending_for_existing_session_and_survive_restart(tmp_path):
+    from persona import profile_revision
+    from voice_settings import save_settings,read_settings
+    args=options();args.settings_file=str(tmp_path/'settings.json')
+    save_settings(args.settings_file,{'volume':80,'personality':'Original personality','table_context':'Kēru'})
+    controller=Controller(args,tmp_path)
+    revision=profile_revision(controller.settings)
+    controller.process=SimpleNamespace(pid=123,returncode=None)
+    (tmp_path/'session.json').write_text(json.dumps(dict(pid=123,heartbeat=time.time(),phase='ready',ready=True,profile_revision=revision)))
+    assert not controller.status()['profile_pending']
+    save_settings(args.settings_file,{'personality':'Edited personality'})
+    controller.settings=read_settings(args.settings_file)
+    assert controller.status()['profile_pending']
+    assert controller.status()['configured_options']['personality']=='Edited personality'
+    restarted=Controller(args,tmp_path)
+    assert not restarted.status()['profile_pending']
+    assert restarted.settings['personality']=='Edited personality'
+
+
 def test_controller_requires_matching_fresh_child_heartbeat(tmp_path):
     controller = Controller(options(), tmp_path)
     assert controller.status()['phase'] == 'off'

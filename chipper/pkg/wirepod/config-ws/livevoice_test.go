@@ -196,6 +196,13 @@ func TestGestureOptionsAndPreviewValidateWithoutStartingSession(t *testing.T) {
 		{"options", `{"nod_depth":20,"nod_interval":4,"legacy_animations":true}`, 200},
 		{"options", `{"autonomy":true,"motion":"full"}`, 200},
 		{"options", `{"autonomy":false,"motion":"arms"}`, 200},
+		{"options", `{"personality":"Tiny menace; one sentence.","table_context":"Jenna, Russell and Kēru"}`, 200},
+		{"options", `{"table_context":""}`, 200},
+		{"options", `{"personality":" "}`, 400},
+		{"options", `{"personality":123}`, 400},
+		{"options", `{"personality":"bad\u0000text"}`, 400},
+		{"options", `{"personality":"` + strings.Repeat("x", 2001) + `"}`, 400},
+		{"options", `{"table_context":"` + strings.Repeat("🦆", 2000) + `"}`, 200},
 		{"options", `{"autonomy":1}`, 400}, {"options", `{"motion":"roam"}`, 400},
 		{"options", `{"nod_depth":21}`, 400}, {"options", `{"nod_depth":true}`, 400},
 		{"options", `{"nod_interval":3}`, 400}, {"options", `{"legacy_animations":"true"}`, 400},
@@ -219,7 +226,7 @@ func TestGestureOptionsAndPreviewValidateWithoutStartingSession(t *testing.T) {
 	r.Header.Set("Origin", "http://elsewhere.example")
 	w := httptest.NewRecorder()
 	handleLiveAdmin(w, r)
-	if w.Code != 403 || forwarded != 9 || len(*calls) != 0 {
+	if w.Code != 403 || forwarded != 12 || len(*calls) != 0 {
 		t.Fatal("gesture mutation bypassed validation or started voice")
 	}
 }

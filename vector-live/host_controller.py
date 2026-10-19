@@ -20,6 +20,7 @@ from pathlib import Path
 from aiohttp import web, ClientSession, UnixConnector
 from voice_settings import read_settings, save_settings, validate_options
 from voice_choice import VOICE_POLICY
+from persona import profile_revision
 
 
 class Controller:
@@ -51,6 +52,7 @@ class Controller:
         result.update(boost_db=self.settings['boost_db'], expressions=self.settings['expressions'],
                       autonomy=self.settings['autonomy'], autonomy_pending=False, motion=self.settings['motion'], motor_action=None, motor_actions_completed=0,
                       voice_policy=VOICE_POLICY, voice_name=None, voice_fallback_reason=None,
+                      profile_pending=False,
                       configured_options=dict(self.settings), expressions_state='off', expressions_error=None, nod_depth=self.settings['nod_depth'], nod_interval=self.settings['nod_interval'],
                       legacy_animations=self.settings['legacy_animations'], animation_catalog=[], animation_error=None, last_expression=None)
         if not self.process:
@@ -79,6 +81,7 @@ class Controller:
             if self.stopping or self.closing:
                 result.update(phase='stopping', ready=False, microphone_active=False)
             result['volume_pending'] = result['volume'] != self.volume
+            result['profile_pending'] = bool(heartbeat and heartbeat.get('profile_revision') != profile_revision(self.settings))
         else:
             for key in ('finalized', 'usage', 'elapsed_seconds', 'speaker_segments_completed'):
                 if key in heartbeat:
@@ -207,7 +210,7 @@ async def serve(args):
     with tempfile.TemporaryDirectory(prefix='vector-control-') as directory:
         os.chmod(directory, 0o700)
         controller = Controller(args, directory)
-        app = web.Application(client_max_size=1024)
+        app = web.Application(client_max_size=65536)
         app.router.add_route('*', '/{action}', controller.handle)
         runner = web.AppRunner(app)
         tunnel = watcher = None

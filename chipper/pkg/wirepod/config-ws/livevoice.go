@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const liveUnit = "vector-live.service"
@@ -164,16 +165,20 @@ func handleLiveAdmin(w http.ResponseWriter, r *http.Request) {
 			LegacyAnimations *bool   `json:"legacy_animations"`
 			Autonomy         *bool   `json:"autonomy"`
 			Motion           *string `json:"motion"`
+			Personality      *string `json:"personality"`
+			TableContext     *string `json:"table_context"`
 		}
-		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024))
+		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 65536))
 		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&body); err != nil || (body.Boost == nil && body.Expressions == nil && body.NodDepth == nil && body.NodInterval == nil && body.LegacyAnimations == nil && body.Autonomy == nil && body.Motion == nil) ||
+		if err := decoder.Decode(&body); err != nil || (body.Boost == nil && body.Expressions == nil && body.NodDepth == nil && body.NodInterval == nil && body.LegacyAnimations == nil && body.Autonomy == nil && body.Motion == nil && body.Personality == nil && body.TableContext == nil) ||
+			(body.Personality != nil && (strings.TrimSpace(*body.Personality) == "" || utf8.RuneCountInString(*body.Personality) > 2000 || strings.ContainsRune(*body.Personality, 0))) ||
+			(body.TableContext != nil && (utf8.RuneCountInString(*body.TableContext) > 2000 || strings.ContainsRune(*body.TableContext, 0))) ||
 			(body.Motion != nil && *body.Motion != "off" && *body.Motion != "arms" && *body.Motion != "full") ||
 			(body.Boost != nil && *body.Boost != 0 && *body.Boost != 3 && *body.Boost != 6) ||
 			(body.Expressions != nil && *body.Expressions != "off" && *body.Expressions != "eyes" && *body.Expressions != "head") ||
 			(body.NodDepth != nil && (*body.NodDepth < 2 || *body.NodDepth > 20)) ||
 			(body.NodInterval != nil && (*body.NodInterval < 4 || *body.NodInterval > 30)) || decoder.Decode(&struct{}{}) != io.EOF {
-			liveJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid voice options. Nod depth2–20degrees; interval4–30seconds."})
+			liveJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid voice options. Personality must be nonempty; profile fields allow 2,000 characters each. Nod depth 2–20 degrees; interval 4–30 seconds."})
 			return
 		}
 		payload := map[string]interface{}{}
@@ -197,6 +202,12 @@ func handleLiveAdmin(w http.ResponseWriter, r *http.Request) {
 		}
 		if body.Motion != nil {
 			payload["motion"] = *body.Motion
+		}
+		if body.Personality != nil {
+			payload["personality"] = *body.Personality
+		}
+		if body.TableContext != nil {
+			payload["table_context"] = *body.TableContext
 		}
 		raw, _ := json.Marshal(payload)
 		liveMutationLock.Lock()

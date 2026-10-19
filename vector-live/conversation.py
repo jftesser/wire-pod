@@ -24,6 +24,7 @@ from runtime_status import RuntimeStatus
 from host_audio_bridge import HostAudioBridge
 from native_audio_bridge import NativeAudioBridge
 from voice_settings import read_settings
+from persona import profile_revision
 from conversation_behaviors import ConversationBehaviors
 from legacy_animations import LEGACY_MAP
 from aiohttp import web
@@ -48,6 +49,8 @@ async def conversation(args):
 
 
 async def _conversation(args, robot, status, resources):
+    initial_settings = read_settings(getattr(args, 'settings_file', None), args.volume)
+    session_profile_revision = profile_revision(initial_settings)
     controls = await resources.enter_async_context(contextlib.AsyncExitStack())
     continuous = args.input_mode == 'continuous'
     native = continuous and getattr(args, 'input_source', 'host') == 'vector-sdk'
@@ -116,6 +119,7 @@ async def _conversation(args, robot, status, resources):
             'amount': {'type': 'number', 'minimum': -90, 'maximum': 100}},
             'required': ['action', 'amount'], 'additionalProperties': False}, 'strict': True})
     session = LiveVoice(read_key(args.key_file), player.feed, voice=FALLBACK_VOICE,
+        personality=initial_settings['personality'], table_context=initial_settings['table_context'],
         preferred_voice_name=PREFERRED_VOICE, greet=args.greet, tools=tools, tool_handler=tool_handler, input_mode=args.input_mode)
     behaviors = ConversationBehaviors(robot, player, session)
     active = set()
@@ -145,6 +149,7 @@ async def _conversation(args, robot, status, resources):
     async def publish_status():
         while True:
             status.write(phase='ready' if ready else 'starting', ready=ready,
+                profile_revision=session_profile_revision,
                 microphone_active=(host.running and host.frames > 0 and not host.error and (not native or (host.last_native_frame is not None and time.monotonic()-host.last_native_frame < 1))) if host else capture_lock.locked(), speaking=player.clip is not None,
                 input_idle_seconds=round(time.monotonic() - (host.last_activity if host else last_input), 1),
                 speaker_segments_completed=player.segments_played, volume=player.volume,

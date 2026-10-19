@@ -30,6 +30,24 @@ wheel movement, control loss, or disabling head gestures. Optional expression
 failures are visible in admin and do not tear down otherwise working voice.
 Stop cancels head actions before releasing SDK control; face images expire.
 
+## Editable conference personality
+
+The admin saves separate **personality and speaking style** and **table context**
+fields, up to 2,000 characters each. Save explicitly; polling preserves unsaved
+drafts. Saved profiles apply on the next Start, and an active session reports
+when a restart is needed. Both Live and its delegated response backend receive
+the same profile; robot capabilities, stop handling and movement limits remain
+in the fixed operational instructions.
+
+The default is a tiny, foul-mouthed former party animal with dry, dark humor,
+prompted to answer in one short sentence. The conference context places Jenna,
+Kēru the Moflin, the 1990s goth duck and the NFC objects at the table; Russell is
+home background and is explicitly not attending. NFC context comes from the
+other project's Enchanted Object app: phone taps open individual pages for
+account-free configuration, preview, sealing and subsequent sharing of messages
+and contact details. Vector can explain that flow but has no tag/page access.
+One-sentence delivery is prompt guidance, not a hard audio truncation mechanism.
+
 ## Natural behavior and requested movement
 
 The admin's **Keep ordinary Vector behavior during Live** switch takes effect on
@@ -159,7 +177,7 @@ the custom continuous feed overcomes those gaps for the SDK path.
 
 This companion adds bounded OpenAI voice conversations to wire-pod. Continuous
 sessions prefer the saved custom voice named Vector, with Stone as the fallback,
-and use a curious, warm, playfully earnest personality. Available input paths
+and use the editable conference personality described above. Available input paths
 are Vector's wake-word request stream, the custom native continuous SDK feed,
 and an optional explicitly selected host microphone. The native SDK and wake
 paths have passed owner-present spoken rehearsals. The host path remains an
