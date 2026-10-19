@@ -1,0 +1,25 @@
+[Unit]
+Description=Vector GPT-Live conversation (on demand)
+After=network-online.target wire-pod.service
+Wants=network-online.target
+Requires=wire-pod.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/vector-live-app
+ExecStartPre=/usr/bin/rm -f /home/pi/vector-live-runtime/live.sock
+ExecStart=/home/pi/vector-live-app/.venv/bin/python /home/pi/vector-live-app/conversation.py --local-socket /home/pi/vector-live-runtime/live.sock --wirepod http://127.0.0.1:8080 --key-file /home/pi/vector-live-app/.env --greet --seconds 600 --volume 80 --status-file /run/vector-live-companion/status.json
+RuntimeDirectory=vector-live-companion
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+Restart=no
+TimeoutStopSec=25
+KillSignal=SIGINT
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/pi/vector-live-runtime

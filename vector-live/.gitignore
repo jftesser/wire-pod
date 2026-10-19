@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.env*
+*.wav
+*.pcm
+*.aiff
+*.mp3
+*.key
+*.pem
+firmware/wire-os-victor/
+firmware/images/
+firmware/logs/

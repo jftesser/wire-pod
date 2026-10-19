@@ -1,0 +1,134 @@
+{
+  "date": "2026-10-19",
+  "robot_serial": "00a14a38",
+  "continuous": {
+    "frames": 736,
+    "audio_seconds": 73.6,
+    "rms_dbfs": -41.1,
+    "peak_dbfs": -9.7,
+    "group_discontinuities": 0,
+    "max_delivery_interval_ms": 250.2,
+    "longest_identical_non_silent_run": 0,
+    "suspected_test_or_stuck_signal": false,
+    "wall_seconds": 75.004,
+    "first_group": 0,
+    "source_timestamp_deltas_ms": {
+      "101": 212,
+      "102": 462,
+      "104": 8,
+      "100": 13,
+      "103": 38,
+      "99": 2
+    },
+    "source_span_ms": 74780,
+    "pcm_file": false,
+    "paid_api": false
+  },
+  "restarts": [
+    {
+      "restart": 1,
+      "capture": {
+        "frames": 28,
+        "audio_seconds": 2.8,
+        "rms_dbfs": -49.1,
+        "peak_dbfs": -35.1,
+        "group_discontinuities": 0,
+        "max_delivery_interval_ms": 178.7,
+        "longest_identical_non_silent_run": 0,
+        "suspected_test_or_stuck_signal": false,
+        "wall_seconds": 3.001,
+        "first_group": 0,
+        "source_timestamp_deltas_ms": {
+          "102": 18,
+          "101": 8,
+          "103": 1
+        },
+        "source_span_ms": 2747,
+        "pcm_file": false,
+        "paid_api": false
+      }
+    },
+    {
+      "restart": 2,
+      "capture": {
+        "frames": 27,
+        "audio_seconds": 2.7,
+        "rms_dbfs": -46.3,
+        "peak_dbfs": -30.1,
+        "group_discontinuities": 0,
+        "max_delivery_interval_ms": 164.2,
+        "longest_identical_non_silent_run": 0,
+        "suspected_test_or_stuck_signal": false,
+        "wall_seconds": 3.001,
+        "first_group": 0,
+        "source_timestamp_deltas_ms": {
+          "102": 19,
+          "101": 7
+        },
+        "source_span_ms": 2645,
+        "pcm_file": false,
+        "paid_api": false
+      }
+    },
+    {
+      "restart": 3,
+      "capture": {
+        "frames": 28,
+        "audio_seconds": 2.8,
+        "rms_dbfs": -47.0,
+        "peak_dbfs": -26.3,
+        "group_discontinuities": 0,
+        "max_delivery_interval_ms": 202.4,
+        "longest_identical_non_silent_run": 0,
+        "suspected_test_or_stuck_signal": false,
+        "wall_seconds": 3.001,
+        "first_group": 0,
+        "source_timestamp_deltas_ms": {
+          "101": 6,
+          "102": 19,
+          "103": 1,
+          "100": 1
+        },
+        "source_span_ms": 2747,
+        "pcm_file": false,
+        "paid_api": false
+      }
+    }
+  ],
+  "replay": {
+    "replay": "eight seconds from after forty seconds; RAM only",
+    "seconds": 7.9
+  },
+  "owner_replay_feedback": "Owner was not speaking at the beginning; recognized accurate ambient room noise. No particular words or ASR accuracy claimed.",
+  "abrupt_client_exit_and_reconnect": {
+    "frames": 25,
+    "audio_seconds": 2.5,
+    "rms_dbfs": -46.0,
+    "peak_dbfs": -29.2,
+    "group_discontinuities": 0,
+    "max_delivery_interval_ms": 249.2,
+    "longest_identical_non_silent_run": 0,
+    "suspected_test_or_stuck_signal": false,
+    "wall_seconds": 3.002,
+    "first_group": 0,
+    "source_timestamp_deltas_ms": {
+      "102": 18,
+      "101": 6
+    },
+    "source_span_ms": 2442,
+    "pcm_file": false,
+    "paid_api": false
+  },
+  "simultaneous_capture": {
+    "frames": 38,
+    "audio_seconds": 3.8,
+    "rms_dbfs": -45.5,
+    "peak_dbfs": -31.2,
+    "group_discontinuities": 0,
+    "max_delivery_interval_ms": 224.2,
+    "longest_identical_non_silent_run": 0,
+    "suspected_test_or_stuck_signal": false,
+    "frames_delivered_during_playback": 9
+  },
+  "limits": "Continuous transport demonstrated over75s wall time, not indefinite operation, validated echo cancellation or a completed OpenAI conversation integration."
+}

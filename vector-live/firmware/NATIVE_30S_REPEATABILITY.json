@@ -1,0 +1,40 @@
+{
+  "source_commit": "8fc055ac5c7538601a319149fb62275207719140",
+  "base_os": "3.0.2.35d",
+  "paid_api": false,
+  "audio_file": false,
+  "rearm": {
+    "sdk_control_take_release": true,
+    "added_delay_seconds": 0.35,
+    "observed_gap_seconds": [
+      3.212
+    ]
+  },
+  "windows": [
+    {
+      "frames": 250,
+      "audio_seconds": 30,
+      "rms_dbfs": -39.2,
+      "peak_dbfs": -7.4,
+      "max_delivery_interval_ms": 192.5,
+      "longest_identical_non_silent_run": 0,
+      "suspected_test_or_stuck_signal": false,
+      "complete": true,
+      "wall_seconds": 30.468,
+      "server_speech_cutoff_bypassed": true
+    },
+    {
+      "frames": 250,
+      "audio_seconds": 30,
+      "rms_dbfs": -39.2,
+      "peak_dbfs": -7.1,
+      "max_delivery_interval_ms": 263.1,
+      "longest_identical_non_silent_run": 0,
+      "suspected_test_or_stuck_signal": false,
+      "complete": true,
+      "wall_seconds": 30.447,
+      "server_speech_cutoff_bypassed": true
+    }
+  ],
+  "limitation": "Receiver timing only; no source sample timestamps or sequence numbers. This is a bounded window test, not continuous listening."
+}

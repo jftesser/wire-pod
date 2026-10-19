@@ -1,0 +1,164 @@
+{
+  "created_utc": "2026-10-19T19:18:37.552716+00:00",
+  "source_repo": "https://github.com/os-vector/wire-os-victor",
+  "source_commit": "8fc055ac5c7538601a319149fb62275207719140",
+  "externals_commit": "6aec7f1ddf341a898692768650fe945e334fb865",
+  "toolchain": "6.0.0-r08, Clang 20.1.8, arm64 macOS host / arm vicos target",
+  "images": [
+    {
+      "file": "Unlock-Prod.ota",
+      "source_url": "https://websetup.skittle.dev/static/firmware/utility/Unlock-Prod.ota",
+      "bytes": 175349760,
+      "sha256": "0765574a6f3a9b65ff2d3d4181f9fc0eea800c810468f480e8b822b73d38110b"
+    },
+    {
+      "file": "WireOS-dev.ota",
+      "source_url": "https://websetup.skittle.dev/static/firmware/custom%20firmware/WireOS",
+      "bytes": 175329280,
+      "sha256": "c9329f6c4d4b034b1d06918be6dfb67ecd061884d08f874d11f7272330c058c0"
+    }
+  ],
+  "baseline": {
+    "build_exit": 0,
+    "stage_exit": 0,
+    "compatibility": 209,
+    "artifact_directory": "images/baseline/anki",
+    "files": {
+      "bin/vic-anim": {
+        "bytes": 3662268,
+        "sha256": "fc82b264a7d4d8aac9fc70ac3d8ab0fa3abc4c67b56d4df47ffb91dd63534661"
+      },
+      "bin/vic-engine": {
+        "bytes": 255904,
+        "sha256": "b5c0f9c92c5b6b31244318cc4874b8b37e975afe8b296258e19ef33135339da8"
+      },
+      "bin/vic-cloud": {
+        "bytes": 4633756,
+        "sha256": "626253b0774fda580c6c517891a973f6e5f87a66bdd941d9d34ca7f56783491f"
+      },
+      "lib/libcozmo_engine.so": {
+        "bytes": 17522868,
+        "sha256": "5bfcceb35b55dbe7bd310ad27e4753656b3f30a0e805952da0b35b3cea401c71"
+      }
+    }
+  },
+  "experiment": {
+    "patch": "long-listening-30s.patch",
+    "sha256": "435b173116cf111e1a898118697a2e47bc40a0a7269b7ea2ba0700954c206cdf",
+    "native_microphone_limit_ms": 30050,
+    "behavior_limit_seconds": 35,
+    "gateway_timeout_seconds": 35,
+    "build": "succeeded",
+    "deployed": true,
+    "build_exit": 0,
+    "files": {
+      "bin/vic-anim": {
+        "bytes": 3662268,
+        "sha256": "34dce12b51b183ff5f0d7100bc9f63d7158e066e4ce5ffa6c071ad6492cce751"
+      },
+      "bin/vic-engine": {
+        "bytes": 255904,
+        "sha256": "fed193ce8c96c142c73393874894f8ba777ec8544aed7f283b74d50faeb58a50"
+      },
+      "bin/vic-cloud": {
+        "bytes": 4632772,
+        "sha256": "5b2a4056a6094a88e8a18f1e70b31b8e45614f0489c71df3ff22e1850a4c590b"
+      },
+      "lib/libcozmo_engine.so": {
+        "bytes": 17522868,
+        "sha256": "d18f7f618862a3254aee1e08b71eacb636e6ba9d4d94c547c2a66f2826cb89da"
+      }
+    },
+    "stage_exit": 0,
+    "artifact_directory": "images/long-listening-30s/anki",
+    "deployment": "Temporary /anki bind mount from /anki-live30-candidate; stock runtime retained underneath; reboot restores stock",
+    "full_staging_checksum_check": "passed; rsync checksum dry run empty",
+    "loader_check": "passed",
+    "automatic_rollback": "five-minute systemd timer armed",
+    "validation": "Three completed native captures, each250frames/30.0seconds; authentic varying PCM; no paid API or audio files",
+    "active": false,
+    "rollback": "Normal unmount was busy; helper issued reboot and stock runtime was verified restored.",
+    "deployment_base": "3.0.2.35d, compatibility209",
+    "routing_corrected": true,
+    "staging_transfer_exit": 0,
+    "core_hashes_verified_on_35d": true,
+    "loader_check_on_35d": "passed",
+    "update_timer_runtime_masked": true,
+    "results": [
+      "NATIVE_30S_RESULT.json",
+      "NATIVE_30S_REPEATABILITY.json"
+    ],
+    "observed_rearm_gap_seconds": 3.212,
+    "restoration": "Verified stock35d original hashes, no test bind mount, read-only root, inactive rollback units, active robot target and successful SDK status; owner confirmed normal clock command works."
+  },
+  "robot_verification": {
+    "date": "2026-10-19",
+    "serial": "00a14a38",
+    "name": "Vector-B3N8",
+    "address": "10.0.0.91",
+    "os": "3.0.2.35d",
+    "runtime_version": "3.0.2.0",
+    "compatibility": 209,
+    "kernel": "4.9.277-wrynose-perf",
+    "developer_ssh": true,
+    "custom_deployed": false,
+    "sdk_status": "Final restored-stock SDK status succeeded",
+    "backup": {
+      "file": "images/robot-backup-20261019/personal-settings-stable.tar.gz",
+      "members": 748,
+      "uncompressed_bytes": 7240192,
+      "sha256": "7cc76a9844d3047211d0f07d9b2273436acf432a352929800cf9477b1beb7a98",
+      "gzip_and_tar_trailer_verified": true,
+      "ssh_exit": 0,
+      "note": "Live personal-data/settings backup; active services were not stopped for this successful attempt."
+    },
+    "services_last_confirmed": "stock robot target, engine and cloud active",
+    "stock_core_matches_saved_ota": true,
+    "battery_latest_volts": 3.9717,
+    "battery_latest_level": "full",
+    "wifi_signal_dbm": -35,
+    "network_recovery": "Owner reboot and reseating; subsequent four-packet ping had zero loss",
+    "stock_core_sha256_file": "images/robot-backup-20261019/stock-core-verified.txt",
+    "routing": {
+      "previous": "No /data/data/server_config.json override; default chipper vicapi.pvic.xyz:8081",
+      "current": "Pi generated config installed at /data/data/server_config.json; chipper/tms/jdocs escapepod.local:443; public Pi cert at /data/data/wirepod-cert.crt",
+      "pairing_reset": false
+    },
+    "update_timer": "Hourly OnCalendar timer found enabled; stopped and masked at runtime for this boot. Cleared on reboot.",
+    "stock_native_after_routing": {
+      "frames": 50,
+      "audio_seconds": 6.0,
+      "wall_seconds": 5.966,
+      "rms_dbfs": -49.5,
+      "peak_dbfs": -30.7,
+      "max_delivery_interval_ms": 168.0,
+      "longest_identical_non_silent_run": 0,
+      "complete": true,
+      "server_speech_cutoff_bypassed": true,
+      "direct_sdk_trigger": true,
+      "paid_api": false,
+      "audio_file": false
+    },
+    "final_update_timer_enabled_state": "disabled (observed after stock reboot)",
+    "final_owner_clock_check": "passed",
+    "root_filesystem_read_only": true
+  },
+  "current_stock_ota": {
+    "source_url": "https://ota.pvic.xyz/vic/latest/dev.ota",
+    "file": "images/WireOS-current35.ota",
+    "version": "3.0.2.35d",
+    "bytes": 169512960,
+    "sha256": "41546972577d8dcc13fdf3f90ce7b9d019983faa6410d40f0be7c8000df72f30",
+    "internal_payload_hashes_verified": true
+  },
+  "pi_cleanup": {
+    "server_active": true,
+    "live_service_active": false,
+    "diagnostic_socket_present": false,
+    "probe_override_removed": true,
+    "pretest_binary_restored": true,
+    "admin_mode": "legacy",
+    "admin_ready": false,
+    "pretest_binary_sha256": "1935cd4bc800e19a612d9fa56c4139269216009309f9f8eb4490d8bac36bd442"
+  }
+}

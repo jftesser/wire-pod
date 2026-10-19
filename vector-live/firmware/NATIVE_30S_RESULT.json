@@ -1,0 +1,20 @@
+{
+  "source_commit": "8fc055ac5c7538601a319149fb62275207719140",
+  "base_os": "3.0.2.35d",
+  "mode": "temporary firmware bind mount",
+  "trigger": "direct certificate-pinned SDK AppIntent",
+  "paid_api": false,
+  "audio_file": false,
+  "native_result": {
+    "frames": 250,
+    "audio_seconds": 30,
+    "rms_dbfs": -39.4,
+    "peak_dbfs": -8,
+    "max_delivery_interval_ms": 256.1,
+    "longest_identical_non_silent_run": 0,
+    "suspected_test_or_stuck_signal": false,
+    "complete": true,
+    "wall_seconds": 30.466,
+    "server_speech_cutoff_bypassed": true
+  }
+}

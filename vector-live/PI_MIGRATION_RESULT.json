@@ -1,0 +1,51 @@
+{
+  "updated_utc": "2026-10-19T21:33:58.483390+00:00",
+  "state": "deployed; clock-correction validation in progress",
+  "backend_host": "Pi",
+  "mac_audio_or_cloud_dependency": false,
+  "pi_controller_enabled": true,
+  "robot_native_overlay_enabled": true,
+  "automatic_stock_rollback": false,
+  "root_read_only": true,
+  "stock_application_preserved": true,
+  "api_key_reused_in_existing_approved_file": true,
+  "offline_tests": {
+    "Pi": 45,
+    "Mac": 45
+  },
+  "native_capture_probe": {
+    "seconds": 60,
+    "source_groups": 594,
+    "source_group_gaps": 0,
+    "max_upload_lateness_ms": 5.72,
+    "main_peak_rss_kib": 84100,
+    "worker_peak_rss_kib": 47732
+  },
+  "synthetic_cloud_probe": {
+    "max_seconds": 12,
+    "final_usage_seconds": 11.0,
+    "finalized": true,
+    "error": null,
+    "room_microphone": false,
+    "audible_playback": false
+  },
+  "first_attended_trial": {
+    "speaker_segments_completed": 6,
+    "final_usage_seconds": 58.0,
+    "finalized": true,
+    "error": "Native echo processor disconnected.",
+    "owner_report": "Voice sounded glitched and lost track after a while."
+  },
+  "silent_reproduction": {
+    "failed_after_wall_seconds": 39.14,
+    "source_group_gaps": 0,
+    "error": "Native echo processor: Invalid or excessive speaker reference.",
+    "max_upload_lateness_ms": 3.9
+  },
+  "correction": "Resample each native PCM group to the interval measured by successive robot timestamps; preserve sample order, bound timestamp changes, keep echo-reference queue bound.",
+  "corrected_reference_stress": "pending",
+  "corrected_attended_trial": "pending",
+  "live_session_active": false,
+  "room_audio_recorded": false,
+  "room_transcripts_logged": false
+}

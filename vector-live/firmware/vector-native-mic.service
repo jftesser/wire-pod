@@ -1,0 +1,13 @@
+[Unit]
+Description=Vector continuous native microphone application overlay
+Requires=mount-data.service
+After=local-fs.target mount-data.service
+Before=vic-init.service vic-anim.service vic-engine.service vic-cloud.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh /data/vector-native-mic/mount-native.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=anki-robot.target

@@ -1,0 +1,100 @@
+<!doctype html>
+<!-- VECTOR LIVE ADMIN PAGE -->
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vector voice · Wire-Pod</title>
+<style>
+  :root {color-scheme:dark; font:16px/1.5 system-ui,sans-serif;background:#151b1d;color:#edf4f1}
+  body {max-width:760px;margin:5vh auto;padding:24px} a {color:#89daca}
+  h1 {font-size:2.3rem;margin:.4em 0} h2 {font-size:1.1rem;margin:0 0 12px}
+  p {color:#bbc9c7} .panel {border:1px solid #344342;border-radius:18px;padding:24px;margin:20px 0;background:#1d2627}
+  .badge {display:inline-block;border:1px solid #71807c;border-radius:99px;padding:5px 12px;font-size:.85rem}
+  .on {background:#193e34;color:#9be9ca;border-color:#47866e}.warn {color:#f6d990;border-color:#a58e59}
+  .error {color:#ffb3ab;border-color:#a96660} .facts {display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .facts small {display:block;color:#9dafaa}.facts strong {display:block;font-weight:500}
+  button {font:inherit;cursor:pointer;border:1px solid #668b81;border-radius:10px;padding:12px 18px;margin:6px 8px 6px 0;background:#b0edda;color:#112c23}
+  button.secondary {background:transparent;color:#c5d8d1}button.stop {background:#ddafa5;color:#2d1712;border-color:#ddafa5}
+  button:disabled {opacity:.4;cursor:not-allowed} #message {min-height:1.5em;color:#f6d990}
+  .note {font-size:.9rem} @media(max-width:500px){body{padding:16px}.facts{grid-template-columns:1fr}}
+</style>
+<a href="/">← Wire-Pod</a>
+<h1>Vector voice</h1>
+<p>Choose how Vector listens, and see what is actually running.</p>
+<section class="panel" aria-live="polite">
+  <span id="badge" class="badge warn">Checking status…</span>
+  <h2 id="mode" style="margin-top:18px">Connecting to voice controls</h2>
+  <div class="facts">
+    <div><small>Microphone</small><strong id="microphone">—</strong></div>
+    <div><small>Speaker</small><strong id="speaker">—</strong></div>
+    <div><small>Input source</small><strong id="source">—</strong></div>
+    <div><small>Session</small><strong id="elapsed">—</strong></div>
+  </div>
+  <p id="mode-note" class="note"></p>
+  <button id="stop" class="stop" disabled>Stop conversation</button>
+</section>
+<section class="panel">
+  <h2>Continuous conversation</h2>
+  <p id="continuous-reason">Checking microphone availability…</p>
+  <button id="continuous" disabled>Start continuous listening</button>
+</section>
+<section class="panel">
+  <h2>Wake-word prototype</h2>
+  <p>Uses Vector’s own microphone. Say “Hey Vector” before every turn.</p>
+  <button id="wake" class="secondary" disabled>Start wake-word prototype</button>
+  <p class="note">Marin voice · closes after 60 seconds idle or 10 minutes maximum.</p>
+</section>
+<p id="message" role="alert"></p>
+<script>
+const $ = id => document.getElementById(id);
+let busy = false, latest = null, actionError = '';
+async function request(endpoint, body) {
+  const options = {signal:AbortSignal.timeout(6000),cache:'no-store'};
+  if (body) Object.assign(options,{method:'POST',headers:{'Content-Type':'application/json','X-Vector-Control':'1'},body:JSON.stringify(body)});
+  const response = await fetch('/api/vector-live/'+endpoint, options);
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'Voice controls are unavailable.');
+  return result;
+}
+function render(state) {
+  latest = state;
+  const active = state.host_active || ['active','activating','deactivating'].includes(state.service_state);
+  const continuous = state.mode === 'continuous';
+  const unknown = ['unverified','conflict'].includes(state.phase);
+  const names = {off:'Legacy mode',starting:'Starting…',ready:'Voice session ready',stopping:'Stopping…',closed:'Session ended',error:'Voice error',unverified:'Status not verified',conflict:'Mode conflict'};
+  $('badge').textContent = names[state.phase] || state.phase;
+  $('badge').className = 'badge '+(state.ready?'on':state.phase==='error'?'error':active?'warn':'');
+  $('mode').textContent = unknown?'Current mode needs attention':active?(continuous?'Continuous conversation':'Wake-word conversation'):'Ordinary Vector commands';
+  $('microphone').textContent = unknown?'Status unknown':state.microphone_active?(continuous?'Listening continuously':'Receiving a wake-word request'):active?(continuous?'Waiting for microphone readiness':'Waiting for “Hey Vector”'):'Handled by ordinary wire-pod';
+  $('speaker').textContent = state.speaking?'Speaking':state.volume?`Quiet · volume ${state.volume}/100`:'Quiet';
+  $('source').textContent = state.source;
+  $('elapsed').textContent = active?`${Math.floor(state.elapsed_seconds || 0)} seconds connected`:'No live session';
+  $('mode-note').textContent = state.error || (active?(continuous?'Speak directly without a wake phrase. The input source shown above stays open while Vector speaks.':'This mode requires “Hey Vector” before each turn.'): 'Live voice is off. Ordinary wire-pod is available.');
+  $('continuous-reason').textContent = state.continuous_reason || 'Uses the input source shown by the controller and Vector’s speaker. Keep the controller computer awake.';
+  $('continuous').disabled = busy || active || !state.continuous_available;
+  $('wake').disabled = busy || active;
+  $('stop').disabled = busy || !active;
+}
+async function refresh() {
+  try {render(await request('status')); if (!busy) $('message').textContent=actionError;}
+  catch(error) {
+    $('badge').textContent='Controls unavailable';$('badge').className='badge error';
+    $('mode').textContent='Current mode could not be verified';
+    $('microphone').textContent=$('speaker').textContent=$('source').textContent=$('elapsed').textContent='Unknown';
+    $('message').textContent=error.message;
+    $('wake').disabled=$('continuous').disabled=true;
+    $('stop').disabled=busy;
+  }
+}
+async function action(endpoint, body) {
+  busy=true; actionError=''; if(latest)render(latest); $('message').textContent=endpoint==='stop'?'Ending the session…':'Starting the session…';
+  try {await request(endpoint,body);}
+  catch(error){actionError=error.message;$('message').textContent=actionError;}
+  finally{busy=false;await refresh();}
+}
+$('wake').onclick=()=>action('start',{mode:'wake'});
+$('continuous').onclick=()=>action('start',{mode:'continuous'});
+$('stop').onclick=()=>action('stop',{});
+refresh();setInterval(refresh,2000);
+</script>
+</html>

@@ -1,0 +1,45 @@
+--- a/lib/micData/micDataTypes.h
++++ b/lib/micData/micDataTypes.h
+@@ -34,7 +34,8 @@
+   static constexpr uint32_t kTriggerLessOverlapSize_ms      = 0;
+   static constexpr uint32_t kTriggerAudioLengthDebug_ms     = 1500; // We only hold onto more audio for FP testing during development
+   static constexpr uint32_t kTriggerAudioLengthShipping_ms  = 750;
+-  static constexpr uint32_t kStreamingTimeout_ms            = 6000 + kTriggerOverlapSize_ms;
++  // Bounded native-microphone experiment; server VAD can still finish ordinary commands early.
++  static constexpr uint32_t kStreamingTimeout_ms            = 30000 + kTriggerOverlapSize_ms;
+   static constexpr uint32_t kStreamingDefaultMinDuration_ms = 4000;
+   static constexpr uint32_t kRawAudioPerBuffer_ms           = 1000;
+ 
+--- a/engine/aiComponent/behaviorComponent/behaviors/robotDrivenDialog/behaviorPromptUserForVoiceCommand.cpp
++++ b/engine/aiComponent/behaviorComponent/behaviors/robotDrivenDialog/behaviorPromptUserForVoiceCommand.cpp
+@@ -55,7 +55,7 @@
+   const char* kVocalResponseToBadIntentKey        = "vocalResponseToBadIntentKey";
+   const char* kVocalRepromptKey                   = "vocalRepromptKey";
+ 
+-  constexpr float kMaxRecordTime_s                = 10.0f; // matches timeouts for TriggerWord and KnowledgeGraph
++  constexpr float kMaxRecordTime_s                = 35.0f; // 30-second mic stream plus response margin.
+ 
+   static_assert( kMaxRecordTime_s >= ( ( MicData::kStreamingTimeout_ms + 2000 ) / 1000.f ),
+                  "kMaxRecordTime_s should be >= kStreamingTimeout_ms by about 2 seconds to give chipper time to respond" );
+--- a/engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToVoiceCommand.cpp
++++ b/engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToVoiceCommand.cpp
+@@ -96,7 +96,7 @@
+   // stream doesn't open within this amount of time, so don't lower this number too much
+   CONSOLE_VAR_RANGED( float, kMinListeningTimeout_s, CONSOLE_GROUP, 5.0f, 0.0f, 30.0f );
+   // this is the maximum duration we'll wait from streaming begin
+-  CONSOLE_VAR_RANGED( float, kMaxStreamingDuration_s, CONSOLE_GROUP, 10.0f, 0.0f, 20.0f );
++  CONSOLE_VAR_RANGED( float, kMaxStreamingDuration_s, CONSOLE_GROUP, 35.0f, 0.0f, 40.0f );
+ 
+ 
+   // when our streaming begins/ends there is a high chance that we will record some non-intent sound, these
+--- a/cloud/internal/voice/process.go
++++ b/cloud/internal/voice/process.go
+@@ -30,7 +30,7 @@
+ 	// SampleBits defines how many bits each sample should contain
+ 	SampleBits = 16
+ 	// DefaultTimeout is the length of time before the process will cancel a voice request
+-	DefaultTimeout = 9 * time.Second
++	DefaultTimeout = 35 * time.Second
+ )
+ 
+ // Process contains the data associated with an instance of the cloud process,

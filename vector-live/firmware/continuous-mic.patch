@@ -1,0 +1,702 @@
+diff --git a/animProcess/src/cozmoAnim/animProcessMessages.cpp b/animProcess/src/cozmoAnim/animProcessMessages.cpp
+index 875a5088..10ba9ad1 100644
+--- a/animProcess/src/cozmoAnim/animProcessMessages.cpp
++++ b/animProcess/src/cozmoAnim/animProcessMessages.cpp
+@@ -531,6 +531,11 @@ void Process_externalAudioChunk(const RobotInterface::ExternalAudioChunk& msg)
+   _animEngine->HandleMessage(msg);
+ }
+ 
++void Process_sdkMicRequest(const RobotInterface::SDKMicRequest& msg)
++{
++  _context->GetMicDataSystem()->SetSDKMicRequest(msg.session, msg.enabled);
++}
++
+ void Process_externalAudioPrepare(const RobotInterface::ExternalAudioPrepare& msg)
+ {
+   _animEngine->HandleMessage(msg);
+diff --git a/animProcess/src/cozmoAnim/micData/micDataProcessor.cpp b/animProcess/src/cozmoAnim/micData/micDataProcessor.cpp
+index be7bb852..5afbf452 100644
+--- a/animProcess/src/cozmoAnim/micData/micDataProcessor.cpp
++++ b/animProcess/src/cozmoAnim/micData/micDataProcessor.cpp
+@@ -786,6 +786,8 @@ void MicDataProcessor::ProcessTriggerLoop()
+     }
+ 
+     const auto& processedAudio = readyDataSpot->audioBlock;
++    _micDataSystem->CollectSDKMicAudio(processedAudio.data(), processedAudio.size(),
++                                     static_cast<uint32_t>(readyDataSpot->timestamp));
+     std::deque<std::shared_ptr<MicDataInfo>> jobs = _micDataSystem->GetMicDataJobs();
+     for (auto& job : jobs)
+     {
+diff --git a/animProcess/src/cozmoAnim/micData/micDataSystem.cpp b/animProcess/src/cozmoAnim/micData/micDataSystem.cpp
+index 5fbba15d..f9dafda6 100644
+--- a/animProcess/src/cozmoAnim/micData/micDataSystem.cpp
++++ b/animProcess/src/cozmoAnim/micData/micDataSystem.cpp
+@@ -351,6 +351,15 @@ void MicDataSystem::RecordAudioInternal(uint32_t duration_ms, const std::string&
+ 
+ void MicDataSystem::Update(BaseStationTime_t currTime_nanosec)
+ {
++  // Send from the animation main thread, never from the real-time mic worker.
++  for (const auto& block : _sdkMicQueue.Drain()) {
++    RobotInterface::SDKMicData msg;
++    msg.session = block.session;
++    msg.sequence = block.sequence;
++    msg.timestamp = block.timestamp;
++    std::copy(block.samples.begin(), block.samples.end(), std::begin(msg.data));
++    RobotInterface::SendAnimToEngine(std::move(msg));
++  }
+   _fftResultData->_fftResultMutex.lock();
+   while (_fftResultData->_fftResultList.size() > 0)
+   {
+@@ -864,6 +873,7 @@ void MicDataSystem::ToggleMicMute()
+   // don't feed the raw audio buffer when receiving messages from robot process. Which stops running the mic processor
+   // and recognizers methods, therefore, saving CPU. However, mic threads are still runing.
+   _micMuted = !_micMuted;
++  if (_micMuted) _sdkMicQueue.Renew(0, false);
+   _micDataProcessor->MuteMics(_micMuted);
+   
+   // play audio event for changing mic mute state
+diff --git a/animProcess/src/cozmoAnim/micData/micDataSystem.h b/animProcess/src/cozmoAnim/micData/micDataSystem.h
+index 6425f106..3599373e 100644
+--- a/animProcess/src/cozmoAnim/micData/micDataSystem.h
++++ b/animProcess/src/cozmoAnim/micData/micDataSystem.h
+@@ -15,6 +15,7 @@
+ #define __AnimProcess_CozmoAnim_MicDataSystem_H_
+ 
+ #include "micDataTypes.h"
++#include "sdkMicQueue.h"
+ #include "coretech/common/shared/types.h"
+ #include "cozmoAnim/speechRecognizer/speechRecognizerSystem.h"
+ #include "util/console/consoleFunction.h"
+@@ -86,6 +87,12 @@ public:
+   SpeechRecognizerSystem* GetSpeechRecognizerSystem() const { return _speechRecognizerSystem.get(); }
+   
+   void ProcessMicDataPayload(const RobotInterface::MicData& payload);
++  void SetSDKMicRequest(uint32_t session, bool enabled) {
++    _sdkMicQueue.Renew(session, enabled && !_micMuted);
++  }
++  void CollectSDKMicAudio(const int16_t* samples, size_t count, uint32_t timestamp) {
++    _sdkMicQueue.Push(samples, count, timestamp);
++  }
+   void RecordRawAudio(uint32_t duration_ms, const std::string& path, bool runFFT);
+   void RecordProcessedAudio(uint32_t duration_ms, const std::string& path);
+   void StartWakeWordlessStreaming(CloudMic::StreamType type, bool playGetInFromAnimProcess);
+@@ -157,6 +164,7 @@ public:
+ 
+ private:
+ 
++  SDKMicQueue _sdkMicQueue;
+   const Anim::AnimContext* _context;
+ 
+   bool IsButtonPressAlexa() const;
+diff --git a/cloud/cloud/message_handler.go b/cloud/cloud/message_handler.go
+index 0d0ad73e..075f8f53 100644
+--- a/cloud/cloud/message_handler.go
++++ b/cloud/cloud/message_handler.go
+@@ -2433,6 +2433,12 @@ func ResetAudioCache(cache *AudioFeedCache) error {
+ }
+ 
+ func UnpackAudioChunk(audioChunk *extint.AudioChunk, cache *AudioFeedCache) bool {
++	if audioChunk == nil || audioChunk.GetAudioChunkCount() != 10 ||
++		audioChunk.GetChunkId() >= 10 || len(audioChunk.GetSignalPower()) != 320 {
++		ResetAudioCache(cache)
++		cache.Invalid = true
++		return false
++	}
+ 	groupId := int32(audioChunk.GetGroupId())
+ 	chunkId := int32(audioChunk.GetChunkId())
+ 
+@@ -2466,6 +2472,11 @@ func UnpackAudioChunk(audioChunk *extint.AudioChunk, cache *AudioFeedCache) bool
+ 	}
+ 
+ 	dataSize := int32(len(audioChunk.GetSignalPower()))
++	if cache.Size+dataSize > int32(len(cache.Data)) {
++		ResetAudioCache(cache)
++		cache.Invalid = true
++		return false
++	}
+ 	copy(cache.Data[cache.Size:cache.Size+dataSize], audioChunk.GetSignalPower()[:])
+ 	cache.Size += dataSize
+ 	cache.LastChunkId = chunkId
+@@ -2473,70 +2484,78 @@ func UnpackAudioChunk(audioChunk *extint.AudioChunk, cache *AudioFeedCache) bool
+ 	return chunkId == int32(audioChunk.GetAudioChunkCount()-1)
+ }
+ 
+-// Long running message for sending audio feed to listening sdk users
++// A single subscriber owns the microphone lease. Reject overlap rather than letting
++// one disconnect silently stop another subscriber's capture.
++var sdkAudioFeedLock sync.Mutex
++var sdkAudioFeedActive bool
++
+ func (service *rpcService) AudioFeed(in *extint.AudioFeedRequest, stream extint.ExternalInterface_AudioFeedServer) error {
+-	// @TODO: Expose other audio processing modes
+-	//
+-	// The composite multi-microphone non-beamforming (AUDIO_VOICE_DETECT_MODE) mode has been identified as the best for voice detection,
+-	// as well as incidentally calculating directional and noise_floor data.  As such it's most reasonable as the SDK's default mode.
+-	//
+-	// While this mode will send directional source data, it is different from DIRECTIONAL_MODE in that it does not isolate and clean
+-	// up the sound stream with respect to the loudest direction (which makes the result more human-ear pleasing but more ml difficult).
+-	//
+-	// It should however be noted that the robot will automatically shift into FAST_MODE (cleaned up single microphone) when
+-	// entering low power mode, so its important to leave this exposed.
+-	//
+-
+-	// Enable audio stream
+-	err := AudioSendModeRequest(extint.AudioProcessingMode_AUDIO_VOICE_DETECT_MODE)
+-	if err != nil {
++	sdkAudioFeedLock.Lock()
++	if sdkAudioFeedActive {
++		sdkAudioFeedLock.Unlock()
++		return grpc.Errorf(codes.ResourceExhausted, "Microphone already in use")
++	}
++	sdkAudioFeedActive = true
++	sdkAudioFeedLock.Unlock()
++	defer func() {
++		sdkAudioFeedLock.Lock()
++		sdkAudioFeedActive = false
++		sdkAudioFeedLock.Unlock()
++	}()
++	// Subscribe before starting: the first source group must not be lost.
++	remove, audioFeedChannel := engineProtoManager.CreateChannel(&extint.GatewayWrapper_AudioChunk{}, 64)
++	defer remove()
++	if err := AudioSendModeRequest(extint.AudioProcessingMode_AUDIO_VOICE_DETECT_MODE); err != nil {
+ 		return err
+ 	}
+-
+-	// Disable audio stream
+ 	defer AudioSendModeRequest(extint.AudioProcessingMode_AUDIO_OFF)
+-
+-	// Forward audio data from engine
+-	f, audioFeedChannel := engineProtoManager.CreateChannel(&extint.GatewayWrapper_AudioChunk{}, 1024)
+-	defer f()
+-
+-	cache := AudioFeedCache{
+-		Data:    nil,
+-		GroupId: -1,
+-		Invalid: false,
+-		Size:    0,
+-	}
+-
+-	for result := range audioFeedChannel {
+-
+-		audioChunk := result.GetAudioChunk()
+-
+-		readyToSend := UnpackAudioChunk(audioChunk, &cache)
+-		if readyToSend {
+-			audioFeedResponse := &extint.AudioFeedResponse{
+-				RobotTimeStamp:     audioChunk.GetRobotTimeStamp(),
+-				GroupId:            uint32(audioChunk.GetGroupId()),
+-				SignalPower:        cache.Data[0:cache.Size],
+-				DirectionStrengths: audioChunk.GetDirectionStrengths(),
+-				SourceDirection:    audioChunk.GetSourceDirection(),
+-				SourceConfidence:   audioChunk.GetSourceConfidence(),
+-				NoiseFloorPower:    audioChunk.GetNoiseFloorPower(),
++	renew := time.NewTicker(time.Second)
++	defer renew.Stop()
++	// Independent engine/animation leases expire after three seconds if this loop stalls or dies.
++	stalled := time.NewTimer(3 * time.Second)
++	defer stalled.Stop()
++	limit := time.NewTimer(15 * time.Minute)
++	defer limit.Stop()
++	cache := AudioFeedCache{GroupId: -1, LastChunkId: -1}
++	for {
++		select {
++		case <-stream.Context().Done():
++			return stream.Context().Err()
++		case <-limit.C:
++			return grpc.Errorf(codes.DeadlineExceeded, "Microphone session reached fifteen-minute limit")
++		case <-stalled.C:
++			return grpc.Errorf(codes.Unavailable, "Native microphone feed stalled")
++		case <-renew.C:
++			if err := AudioSendModeRequest(extint.AudioProcessingMode_AUDIO_VOICE_DETECT_MODE); err != nil {
++				return err
++			}
++		case result, ok := <-audioFeedChannel:
++			if !ok {
++				return grpc.Errorf(codes.Unavailable, "Microphone engine stream closed")
++			}
++			chunk := result.GetAudioChunk()
++			if !UnpackAudioChunk(chunk, &cache) {
++				continue
++			}
++			response := &extint.AudioFeedResponse{
++				RobotTimeStamp: chunk.GetRobotTimeStamp(), GroupId: chunk.GetGroupId(),
++				SignalPower: cache.Data[:cache.Size], DirectionStrengths: chunk.GetDirectionStrengths(),
++				SourceDirection: chunk.GetSourceDirection(), SourceConfidence: chunk.GetSourceConfidence(),
++				NoiseFloorPower: chunk.GetNoiseFloorPower(),
+ 			}
+ 			ResetAudioCache(&cache)
+-
+-			if err := stream.Send(audioFeedResponse); err != nil {
+-				return err
+-			} else if err = stream.Context().Err(); err != nil {
+-				// This is the case where the user disconnects the stream
+-				// We should still return the err in case the user doesn't think they disconnected
++			if err := stream.Send(response); err != nil {
+ 				return err
+ 			}
++			if !stalled.Stop() {
++				select {
++				case <-stalled.C:
++				default:
++				}
++			}
++			stalled.Reset(3 * time.Second)
+ 		}
+ 	}
+-
+-	errMsg := "AudioChunk engine stream died unexpectedly"
+-	log.Errorln(errMsg)
+-	return grpc.Errorf(codes.Internal, errMsg)
+ }
+ 
+ func (service *rpcService) EnableMarkerDetection(ctx context.Context, request *extint.EnableMarkerDetectionRequest) (*extint.EnableMarkerDetectionResponse, error) {
+diff --git a/engine/components/sdkComponent.cpp b/engine/components/sdkComponent.cpp
+index a147e2cd..082fb9bd 100644
+--- a/engine/components/sdkComponent.cpp
++++ b/engine/components/sdkComponent.cpp
+@@ -139,6 +139,12 @@ void SDKComponent::InitDependent(Vector::Robot* robot, const RobotCompMap& depen
+   _signalHandles.push_back(_robot->GetExternalInterface()->Subscribe(GameToEngineTag::SetConnectionStatus,
+                                                                      setConnectionStatusCallback));
+ 
++  _signalHandles.push_back(robot->GetRobotMessageHandler()->Subscribe(
++    RobotInterface::RobotToEngineTag::sdkMicData,
++    [this](const AnkiEvent<RobotInterface::RobotToEngine>& event) {
++      HandleSDKMicData(event.GetData().Get_sdkMicData());
++    }));
++
+   //subscribe to messages back from audio playback
+   auto* messageHandler = robot->GetRobotMessageHandler();
+   _signalHandles.push_back(messageHandler->Subscribe(RobotInterface::RobotToEngineTag::audioStreamStatusEvent, [this](const AnkiEvent<RobotInterface::RobotToEngine>& event) {
+@@ -239,76 +245,52 @@ void SDKComponent::HandleStreamStatusEvent(SDKAudioStreamingState streamStatusId
+   }
+ }
+ 
+-// @TODO: JMRivas - Delete this static and replace with a better way to store whether the audio processing mode on the
+-// robot/animProcess is considered to be under SDK control.
+-static bool _SDK_WANTS_AUDIO = false;
+-void SDKComponent::UpdateDependent(const RobotCompMap& dependentComps)
++void SDKComponent::SetSDKMicEnabled(bool enabled)
+ {
+-  // @TODO: JMRivas - Remove all of this code and replace with a subscription to the true audio feed.
+-  //        Should be similarly formatted into chunks of SAMPLE_COUNTS_PER_SDK_MESSAGE samples, with
+-  //        audio metadata redundantly submitted with each packet.
+-  //        (Note: only the final message's metadata will be used)
+-
+-  static RobotTimeStamp_t _SDK_AUDIO_BROADCAST_TIME = 0;
+-  static u32 _SDK_SAMPLE_GROUP_ID = 0;
+-
+-  RobotTimeStamp_t now = _robot->GetLastMsgTimestamp();
++  if (enabled && !_sdkAudioEnabled) ++_sdkAudioSession;
++  _sdkAudioEnabled = enabled;
++  _sdkAudioExpires = std::chrono::steady_clock::now() + std::chrono::seconds(3);
++  RobotInterface::SDKMicRequest request;
++  request.session = _sdkAudioSession;
++  request.enabled = enabled;
++  _robot->SendMessage(RobotInterface::EngineToRobot(std::move(request)));
++}
+ 
+-  // The robot will send audio data in chunks of 1600 samples, and the animProcess operates
+-  // at a sampling rate of 16000.  The rate at which the robot generates these chunks (and the
+-  // minimum latency of the audiostream) is 100ms on the golden path.
+-  if( _SDK_WANTS_AUDIO && now > _SDK_AUDIO_BROADCAST_TIME + 100 )
+-  {
+-    auto* gi = _robot->GetGatewayInterface();
+-    if (gi == nullptr) return;
+-
+-    _SDK_AUDIO_BROADCAST_TIME = now;
+-    // temporary 1 kHz sine wave generator to test over the wire transfer
+-    std::vector<u8> power_array(external_interface::SAMPLE_COUNTS_PER_SDK_MESSAGE*2);
+-    std::vector<u8> direction_array(external_interface::MIC_DETECTION_DIRECTIONS, 0);
+-    for( u32 i = 0; i < external_interface::SAMPLE_COUNTS_PER_SDK_MESSAGE; i++ ) {
+-      // sin(pi*i/8) will cycle every 16 samples, the robot's sample rate is 16,000
+-      // arbitrarily using amplitude of '1000' rather than max_int16 because its less painful to listen to.
+-      //
+-      // the robot's audio data is in the form of 16 bit signed integers, but the proto
+-      // stores it as a byte array
+-      f32 theta = (f32)i * (3.1415f/8.0f);
+-      s16 powerLevel = (s16)(sin(theta) * 1000.0);
+-      power_array[i*2+0] = reinterpret_cast<const u8* const>(&powerLevel)[0];
+-      power_array[i*2+1] = reinterpret_cast<const u8* const>(&powerLevel)[1];
+-    }
++void SDKComponent::UpdateDependent(const RobotCompMap& dependentComps)
++{
++  if (_sdkAudioEnabled && std::chrono::steady_clock::now() >= _sdkAudioExpires) {
++    SetSDKMicEnabled(false);
++  }
++}
+ 
+-    std::string direction_data;
+-    direction_data.assign(direction_array.begin(), direction_array.begin() + external_interface::MIC_DETECTION_DIRECTIONS);
+-
+-    // Break the audio group into chunks small enough to pass through to gateway.
+-    u32 chunks = external_interface::SAMPLE_COUNTS_PER_SDK_MESSAGE / external_interface::SAMPLE_COUNTS_PER_ENGINE_MESSAGE;
+-    for( u32 i=0; i<chunks; ++i ) {
+-      std::string power_data;
+-      u32 chunkSize = external_interface::SAMPLE_COUNTS_PER_ENGINE_MESSAGE*2;
+-      power_data.assign(power_array.begin() + (chunkSize * i), power_array.begin() + (chunkSize*(i+1)));
+-
+-      // Send audio chunk to gateway
+-      external_interface::AudioChunk* audioChunk = new external_interface::AudioChunk();
+-      audioChunk->set_signal_power(std::move(power_data));
+-      audioChunk->set_direction_strengths(std::move(direction_data));
+-      audioChunk->set_group_id(_SDK_SAMPLE_GROUP_ID);
+-      audioChunk->set_chunk_id(i);
+-      audioChunk->set_audio_chunk_count(chunks);
+-      audioChunk->set_robot_time_stamp((::google::protobuf::uint32)now);
+-      audioChunk->set_source_direction(12);
+-      audioChunk->set_source_confidence(0);
+-      audioChunk->set_noise_floor_power(0);
+-
+-      external_interface::GatewayWrapper wrapper;
+-
+-      wrapper.set_allocated_audio_chunk(audioChunk);
+-      gi->Broadcast(wrapper);
+-      audioChunk = wrapper.release_audio_chunk();
+-      Util::SafeDelete(audioChunk);
+-    }
+-    ++_SDK_SAMPLE_GROUP_ID;
++void SDKComponent::HandleSDKMicData(const RobotInterface::SDKMicData& msg)
++{
++  if (!_sdkAudioEnabled || msg.session != _sdkAudioSession ||
++      std::chrono::steady_clock::now() >= _sdkAudioExpires) return;
++  auto* gi = _robot->GetGatewayInterface();
++  if (!gi) return;
++  static_assert(sizeof(msg.data) == 320, "SDK mic block must be 160 PCM16 samples");
++  auto* chunk = new external_interface::AudioChunk();
++  // Explicit little-endian packing; group/sequence derive from source samples, not engine ticks.
++  std::string pcm(320, '\0');
++  for (size_t i = 0; i < 160; ++i) {
++    const uint16_t sample = static_cast<uint16_t>(msg.data[i]);
++    pcm[2*i] = static_cast<char>(sample & 0xff);
++    pcm[2*i+1] = static_cast<char>(sample >> 8);
+   }
++  chunk->set_signal_power(std::move(pcm));
++  chunk->set_group_id(msg.sequence / 10);
++  chunk->set_chunk_id(msg.sequence % 10);
++  chunk->set_audio_chunk_count(10);
++  chunk->set_robot_time_stamp(msg.timestamp);
++  // This experiment exposes PCM only; do not invent direction/noise metadata.
++  chunk->set_direction_strengths(std::string(12, '\0'));
++  chunk->set_source_direction(12);
++  chunk->set_source_confidence(0);
++  chunk->set_noise_floor_power(0);
++  external_interface::GatewayWrapper wrapper;
++  wrapper.set_allocated_audio_chunk(chunk);
++  gi->Broadcast(wrapper);
+ }
+ 
+ // Determine whether or not image streaming is enabled on the robot
+@@ -330,19 +312,13 @@ void SDKComponent::IsImageStreamingEnabledRequest(
+ 
+ void SDKComponent::OnSendAudioModeRequest(const AnkiEvent<external_interface::GatewayWrapper>& event)
+ {
+-  // @TODO: JMRivas - Replace this functionality with a call or message to whichever process controls
+-  //        the robot's audio processing mode, and lock it into an "SDK OWNED" state until receiving
+-  //        the "AUDIO_OFF" id.
+-  //
+-  //        Any internal change in the audioProcessing state should be broadcast in an AudioSendModeChanged
+-  //        message, whether a direct response to a request or incidental from underlying behavior.
+-
+   auto* gi = _robot->GetGatewayInterface();
+   if (gi == nullptr) return;
+-
+-  external_interface::AudioProcessingMode mode = event.GetData().audio_send_mode_request().mode();
+-
+-  _SDK_WANTS_AUDIO = (mode != external_interface::AUDIO_OFF);
++  const auto requested = event.GetData().audio_send_mode_request().mode();
++  // Reuse the current processed microphone path. Other processing modes are not implemented.
++  const auto mode = requested == external_interface::AUDIO_VOICE_DETECT_MODE
++    ? requested : external_interface::AUDIO_OFF;
++  SetSDKMicEnabled(mode != external_interface::AUDIO_OFF);
+ 
+   // Signal audio mode changed to gateway
+   external_interface::AudioSendModeChanged* changedEvent = new external_interface::AudioSendModeChanged();
+diff --git a/engine/components/sdkComponent.h b/engine/components/sdkComponent.h
+index d9074235..afd91bc9 100644
+--- a/engine/components/sdkComponent.h
++++ b/engine/components/sdkComponent.h
+@@ -19,6 +19,7 @@
+ 
+ #include "util/entityComponent/iDependencyManagedComponent.h"
+ #include "util/signals/simpleSignal_fwd.h"
++#include <chrono>
+ 
+ namespace Anki {
+ namespace Vector {
+@@ -44,6 +45,7 @@ namespace external_interface {
+ }
+ 
+ class Robot;
++namespace RobotInterface { struct SDKMicData; }
+ 
+ // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ class SDKComponent : public IDependencyManagedComponent<RobotComponentID>
+@@ -80,6 +82,11 @@ public:
+ 
+ private:
+ 
++  bool _sdkAudioEnabled = false;
++  uint32_t _sdkAudioSession = 0;
++  std::chrono::steady_clock::time_point _sdkAudioExpires{};
++  void SetSDKMicEnabled(bool enabled);
++  void HandleSDKMicData(const RobotInterface::SDKMicData& msg);
+   Robot* _robot = nullptr;  
+   bool _sdkWantsControl = false;
+   bool _sdkWantsLock = false;
+diff --git a/robot/clad/src/clad/robotInterface/messageEngineToRobot.clad b/robot/clad/src/clad/robotInterface/messageEngineToRobot.clad
+index 3c7d1cdc..af44dfa7 100644
+--- a/robot/clad/src/clad/robotInterface/messageEngineToRobot.clad
++++ b/robot/clad/src/clad/robotInterface/messageEngineToRobot.clad
+@@ -718,6 +718,12 @@ message ExternalAudioComplete {
+ message ExternalAudioCancel {
+ }
+ 
++// Engine heartbeat lease for an explicitly opened SDK microphone session.
++message SDKMicRequest {
++  uint_32 session,
++  bool enabled,
++}
++
+ // Because we're running low on message tags, expand this enum and message as we add more settings
+ // that we want to send to anim/robot.  To expand, update the Process_updatedSettings() method.
+ // We're not using the proto enums for the settings here, because it's proto, not clad, and because
+@@ -874,6 +880,7 @@ union EngineToRobot
+   ExternalAudioChunk            externalAudioChunk          = 0x76,
+   ExternalAudioComplete         externalAudioComplete       = 0x77,
+   ExternalAudioCancel           externalAudioCancel         = 0x78,
++  SDKMicRequest                 sdkMicRequest               = 0x79,
+ 
+   FakeWakeWordFromExternalInterface fakeWakeWordFromExternalInterface = 0x80,
+   ShowUrlFace                   showUrlFace                 = 0x81,
+diff --git a/robot/clad/src/clad/robotInterface/messageRobotToEngine.clad b/robot/clad/src/clad/robotInterface/messageRobotToEngine.clad
+index ad2c573c..a784a312 100644
+--- a/robot/clad/src/clad/robotInterface/messageRobotToEngine.clad
++++ b/robot/clad/src/clad/robotInterface/messageRobotToEngine.clad
+@@ -124,6 +124,14 @@ message MicData
+   float_32 robotRotationAngle,
+ }
+ 
++// Native processed mono PCM, one 10 ms block. Never forwarded to the body firmware.
++message SDKMicData {
++  uint_32 session,
++  uint_32 sequence,
++  uint_32 timestamp,
++  int_16 data[160],
++}
++
+ message AudioPlaybackBegin
+ {
+   string path
+@@ -265,6 +273,8 @@ union RobotToEngine {
+   // SDK Streaming Audio Playback
+   AudioStreamStatusEvent     audioStreamStatusEvent = 0xEB,
+ 
++  SDKMicData                 sdkMicData             = 0xEE,
++
+   // Alexa
+   AlexaAuthChanged           alexaAuthChanged       = 0xEC,
+   AlexaUXChanged             alexaUXChanged         = 0xED,
+diff --git a/lib/micData/sdkMicQueue.h b/lib/micData/sdkMicQueue.h
+new file mode 100644
+index 00000000..74e6c703
+--- /dev/null
++++ b/lib/micData/sdkMicQueue.h
+@@ -0,0 +1,66 @@
++// Bounded, opt-in SDK microphone transport. No recording or cloud job is created.
++#ifndef VECTOR_SDK_MIC_QUEUE_H
++#define VECTOR_SDK_MIC_QUEUE_H
++#include <algorithm>
++#include <array>
++#include <chrono>
++#include <cstdint>
++#include <deque>
++#include <mutex>
++#include <vector>
++namespace Anki { namespace Vector { namespace MicData {
++class SDKMicQueue {
++public:
++  using Clock = std::chrono::steady_clock;
++  struct Block {
++    std::array<int16_t, 160> samples;
++    uint32_t timestamp;
++    uint32_t session;
++    uint32_t sequence;
++  };
++  static constexpr size_t kMaxBlocks = 50; // At most 500 ms / 16 KB of PCM.
++  void Renew(uint32_t session, bool enabled, Clock::time_point now = Clock::now()) {
++    std::lock_guard<std::mutex> lock(_mutex);
++    if (!enabled) { _enabled = false; _blocks.clear(); return; }
++    if (session != _session) {
++      _session = session; _sequence = 0; _failed = false; _enabled = false; _blocks.clear();
++    }
++    if (_enabled && now >= _expires) Fail();
++    // A failed lease/overflow stays latched until a new session explicitly starts.
++    if (_failed) return;
++    _enabled = true;
++    _expires = now + std::chrono::seconds(3);
++  }
++  void Push(const int16_t* samples, size_t count, uint32_t timestamp,
++            Clock::time_point now = Clock::now()) {
++    std::lock_guard<std::mutex> lock(_mutex);
++    if (!Check(now)) return;
++    if (count != 160 || _blocks.size() >= kMaxBlocks) { Fail(); return; }
++    Block block;
++    std::copy(samples, samples + count, block.samples.begin());
++    block.timestamp = timestamp; block.session = _session; block.sequence = _sequence++;
++    _blocks.push_back(std::move(block));
++  }
++  std::vector<Block> Drain(Clock::time_point now = Clock::now()) {
++    std::lock_guard<std::mutex> lock(_mutex);
++    if (!Check(now)) return {};
++    std::vector<Block> result(_blocks.begin(), _blocks.end());
++    _blocks.clear();
++    return result;
++  }
++private:
++  bool Check(Clock::time_point now) {
++    if (_enabled && now >= _expires) Fail();
++    return _enabled;
++  }
++  void Fail() { _failed = true; _enabled = false; _blocks.clear(); }
++  std::mutex _mutex;
++  std::deque<Block> _blocks;
++  Clock::time_point _expires{};
++  uint32_t _session = 0;
++  uint32_t _sequence = 0;
++  bool _enabled = false;
++  bool _failed = false;
++};
++}}}
++#endif
+diff --git a/cloud/cloud/sdk_audio_test.go b/cloud/cloud/sdk_audio_test.go
+new file mode 100644
+index 00000000..526a30d1
+--- /dev/null
++++ b/cloud/cloud/sdk_audio_test.go
+@@ -0,0 +1,107 @@
++package main
++
++import (
++	"context"
++	extint "github.com/digital-dream-labs/vector-cloud/internal/proto/external_interface"
++	"github.com/golang/protobuf/proto"
++	"google.golang.org/grpc"
++	"google.golang.org/grpc/codes"
++	"google.golang.org/grpc/status"
++	"testing"
++	"time"
++)
++
++func micChunk(group, index uint32) *extint.AudioChunk {
++	return &extint.AudioChunk{GroupId: group, ChunkId: index, AudioChunkCount: 10, SignalPower: make([]byte, 320)}
++}
++func TestSDKAudioReassemblyRejectsMissingAndMalformedData(t *testing.T) {
++	cache := AudioFeedCache{GroupId: -1, LastChunkId: -1}
++	for i := uint32(0); i < 10; i++ {
++		if ready := UnpackAudioChunk(micChunk(0, i), &cache); ready != (i == 9) {
++			t.Fatalf("unexpected readiness at %d", i)
++		}
++	}
++	if cache.Size != 3200 {
++		t.Fatal("wrong PCM frame size")
++	}
++	ResetAudioCache(&cache)
++	UnpackAudioChunk(micChunk(1, 0), &cache)
++	if UnpackAudioChunk(micChunk(1, 2), &cache) {
++		t.Fatal("accepted missing chunk")
++	}
++	for i := uint32(0); i < 10; i++ {
++		UnpackAudioChunk(micChunk(2, i), &cache)
++	}
++	if cache.Invalid || cache.Size != 3200 {
++		t.Fatal("did not recover at next complete source group")
++	}
++	malformed := micChunk(3, 0)
++	malformed.SignalPower = make([]byte, 64000)
++	for _, chunk := range []*extint.AudioChunk{nil, malformed, micChunk(3, 100)} {
++		if UnpackAudioChunk(chunk, &cache) {
++			t.Fatal("accepted malformed data")
++		}
++	}
++}
++
++type micFakeConn struct {
++	modes chan extint.AudioProcessingMode
++}
++
++func (c *micFakeConn) Read() []byte      { return nil }
++func (c *micFakeConn) ReadBlock() []byte { return nil }
++func (c *micFakeConn) Close() error      { return nil }
++func (c *micFakeConn) Write(b []byte) (int, error) {
++	var w extint.GatewayWrapper
++	if err := proto.Unmarshal(b[2:], &w); err != nil {
++		return 0, err
++	}
++	c.modes <- w.GetAudioSendModeRequest().GetMode()
++	return len(b), nil
++}
++
++type micFakeStream struct {
++	grpc.ServerStream
++	ctx context.Context
++}
++
++func (s *micFakeStream) Context() context.Context             { return s.ctx }
++func (s *micFakeStream) Send(*extint.AudioFeedResponse) error { return nil }
++func TestSDKAudioCancelWithoutSamplesAndRepeatedOwnership(t *testing.T) {
++	conn := &micFakeConn{modes: make(chan extint.AudioProcessingMode, 16)}
++	oldConn, oldChannels := engineProtoManager.conn, engineProtoManager.managedChannels
++	engineProtoManager.conn = conn
++	engineProtoManager.managedChannels = make(map[string][]chan extint.GatewayWrapper)
++	defer func() { engineProtoManager.conn = oldConn; engineProtoManager.managedChannels = oldChannels }()
++	expect := func(want extint.AudioProcessingMode) {
++		t.Helper()
++		select {
++		case got := <-conn.modes:
++			if got != want {
++				t.Fatalf("mode %v, want %v", got, want)
++			}
++		case <-time.After(time.Second):
++			t.Fatal("microphone control did not complete")
++		}
++	}
++	service := &rpcService{}
++	for attempt := 0; attempt < 3; attempt++ {
++		ctx, cancel := context.WithCancel(context.Background())
++		done := make(chan error, 1)
++		go func() { done <- service.AudioFeed(&extint.AudioFeedRequest{}, &micFakeStream{ctx: ctx}) }()
++		expect(extint.AudioProcessingMode_AUDIO_VOICE_DETECT_MODE)
++		if err := service.AudioFeed(&extint.AudioFeedRequest{}, &micFakeStream{ctx: ctx}); status.Code(err) != codes.ResourceExhausted {
++			t.Fatalf("overlap returned %v", err)
++		}
++		cancel()
++		expect(extint.AudioProcessingMode_AUDIO_OFF)
++		select {
++		case <-done:
++		case <-time.After(time.Second):
++			t.Fatal("cancel hung without mic samples")
++		}
++		if sdkAudioFeedActive || len(engineProtoManager.managedChannels) != 0 {
++			t.Fatal("microphone owner/listener leaked")
++		}
++	}
++}
+diff --git a/cloud/cloud/sdk_audio_darwin_test.go b/cloud/cloud/sdk_audio_darwin_test.go
+new file mode 100644
+index 00000000..dbead792
+--- /dev/null
++++ b/cloud/cloud/sdk_audio_darwin_test.go
+@@ -0,0 +1,13 @@
++//go:build darwin
++
++package main
++
++import "net/http"
++
++// Upstream's macOS gateway config is commented out. Supply platform values only
++// to offline unit tests; these are never compiled into the robot gateway.
++const Port = 8443
++const SocketPath = "/tmp/vector-sdk-offline-test/"
++const IsOnRobot = false
++
++func checkAuth(_ http.ResponseWriter, _ *http.Request) (string, error) { return "offline-test", nil }

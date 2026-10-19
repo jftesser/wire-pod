@@ -23,6 +23,10 @@ import (
 var SttInitFunc func() error
 
 func apiHandler(w http.ResponseWriter, r *http.Request) {
+	if strings.HasPrefix(r.URL.Path, "/api/vector-live/") {
+		handleLiveAdmin(w, r)
+		return
+	}
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "*")
 

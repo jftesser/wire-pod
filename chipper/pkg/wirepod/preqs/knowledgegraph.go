@@ -2,8 +2,8 @@ package processreqs
 
 import (
 	"encoding/json"
-	"strings"
 	"regexp"
+	"strings"
 
 	pb "github.com/digital-dream-labs/api/go/chipperpb"
 	"github.com/kercre123/wire-pod/chipper/pkg/logger"
@@ -70,8 +70,15 @@ func houndifyKG(req sr.SpeechRequest) string {
 func streamingKG(req *vtt.KnowledgeGraphRequest, speechReq sr.SpeechRequest) string {
 	// have him start "thinking" right after the text is transcribed
 	transcribedText, err := sttHandler(speechReq)
-	if err != nil {
-		return "There was an error."
+	speechReq.Tap.Close()
+	if err != nil || strings.TrimSpace(transcribedText) == "" {
+		// Complete the request before starting the SDK thinking loop or an LLM
+		// call. Empty messages are rejected by providers and can strand that loop.
+		_ = req.Stream.Send(&pb.KnowledgeGraphResponse{
+			Session: req.Session, DeviceId: req.Device,
+			CommandType: NoResult, SpokenText: "",
+		})
+		return ""
 	}
 	kg := pb.KnowledgeGraphResponse{
 		Session:     req.Session,
@@ -101,6 +108,10 @@ func KgRequest(req *vtt.KnowledgeGraphRequest, speechReq sr.SpeechRequest) strin
 func (s *Server) ProcessKnowledgeGraph(req *vtt.KnowledgeGraphRequest) (*vtt.KnowledgeGraphResponse, error) {
 	InitKnowledge()
 	speechReq := sr.ReqToSpeechRequest(req)
+	defer speechReq.Tap.Close()
+	if tryLiveVoice(req, &speechReq) {
+		return nil, nil
+	}
 	if vars.APIConfig.Knowledge.Enable && vars.APIConfig.Knowledge.Provider != "houndify" {
 		streamingKG(req, speechReq)
 	} else {
@@ -131,21 +142,21 @@ func houndifyTextRequest(queryText string, device string, session string) string
 	if !vars.APIConfig.Knowledge.Enable || vars.APIConfig.Knowledge.Provider != "houndify" {
 		return "Houndify is not enabled."
 	}
-	
+
 	logger.Println("Sending text request to Houndify...")
-	
+
 	req := houndify.TextRequest{
 		Query:     queryText,
 		UserID:    device,
 		RequestID: session,
 	}
-	
+
 	serverResponse, err := HKGclient.TextSearch(req)
 	if err != nil {
 		logger.Println("Error sending text request to Houndify:", err)
 		return ""
 	}
-	
+
 	apiResponse, err := ParseSpokenResponse(serverResponse)
 	if err != nil {
 		logger.Println("Error parsing Houndify response:", err)
@@ -154,7 +165,7 @@ func houndifyTextRequest(queryText string, device string, session string) string
 	}
 
 	apiResponse = cleanHoundifyResponse(apiResponse)
-	
+
 	logger.Println("Houndify response:", apiResponse)
 	return apiResponse
 }

@@ -1,0 +1,2 @@
+# Patch context preserves upstream whitespace for reproducibility.
+vector-live/firmware/*.patch -whitespace

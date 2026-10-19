@@ -13,10 +13,15 @@ import (
 func (s *Server) ProcessIntentGraph(req *vtt.IntentGraphRequest) (*vtt.IntentGraphResponse, error) {
 	var successMatched bool
 	speechReq := sr.ReqToSpeechRequest(req)
+	defer speechReq.Tap.Close()
+	if tryLiveVoice(req, &speechReq) {
+		return nil, nil
+	}
 	var transcribedText string
 	if !isSti {
 		var err error
 		transcribedText, err = sttHandler(speechReq)
+		speechReq.Tap.Close()
 		if err != nil {
 			ttr.IntentPass(req, "intent_system_noaudio", "voice processing error: "+err.Error(), map[string]string{"error": err.Error()}, true)
 			return nil, nil

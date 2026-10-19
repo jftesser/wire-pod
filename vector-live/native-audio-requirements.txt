@@ -1,0 +1,7 @@
+# ARM native worker environment validated on Debian13/Python3.13.
+# Keep separate from anki-vector's protobuf3 environment.
+aiofiles==25.1.0
+livekit==1.1.18
+numpy==2.5.4
+protobuf==7.36.2
+types-protobuf==7.35.1.20260906

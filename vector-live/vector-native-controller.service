@@ -1,0 +1,25 @@
+[Unit]
+Description=Vector native microphone Live controller (idle until web Start)
+After=network-online.target wire-pod.service
+Wants=network-online.target wire-pod.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/vector-live-native
+ExecStart=/home/pi/vector-live-app/.venv/bin/python /home/pi/vector-live-native/host_controller.py --input-source vector-sdk --audio-python /home/pi/vector-native-audio/bin/python --local-control-socket /home/pi/vector-live-runtime/control.sock --wirepod http://127.0.0.1:8080 --key-file /home/pi/vector-live-app/.env --seconds 600 --volume 80 --session-log /home/pi/vector-live-runtime/native-session.jsonl
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=45
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/pi/vector-live-runtime
+MemoryMax=384M
+
+[Install]
+WantedBy=multi-user.target
