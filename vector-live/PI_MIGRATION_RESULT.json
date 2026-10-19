@@ -1,6 +1,6 @@
 {
-  "updated_utc": "2026-10-19T21:33:58.483390+00:00",
-  "state": "deployed; clock-correction validation in progress",
+  "updated_utc": "2026-10-19T21:37:48.710390+00:00",
+  "state": "Pi deployment complete; corrected audible rehearsal pending owner readiness",
   "backend_host": "Pi",
   "mac_audio_or_cloud_dependency": false,
   "pi_controller_enabled": true,
@@ -43,9 +43,59 @@
     "max_upload_lateness_ms": 3.9
   },
   "correction": "Resample each native PCM group to the interval measured by successive robot timestamps; preserve sample order, bound timestamp changes, keep echo-reference queue bound.",
-  "corrected_reference_stress": "pending",
+  "corrected_reference_stress": {
+    "native_microphone": {
+      "frames": 1184,
+      "audio_seconds": 118.4,
+      "rms_dbfs": -47.8,
+      "peak_dbfs": -7.5,
+      "group_discontinuities": 0,
+      "max_delivery_interval_ms": 293.0,
+      "longest_identical_non_silent_run": 0,
+      "suspected_test_or_stuck_signal": false
+    },
+    "processed_frames": 12036,
+    "simulated_upload_frames": 12001,
+    "simulated_upload_max_lateness_ms": 11.64,
+    "max_input_queue_ms": 310.0,
+    "padded_upload_frames": 12,
+    "wall_seconds": 121.74,
+    "main_cpu_percent": 15.5,
+    "main_peak_rss_kib": 84560,
+    "worker_memory_kib": {
+      "VmHWM": 47856,
+      "VmRSS": 47856
+    },
+    "paid_api": false,
+    "audible_playback": false,
+    "room_audio_recorded": false,
+    "synthetic_render_reference": true,
+    "worker_error": null,
+    "source_clock": {
+      "groups": 1184,
+      "input_samples": 1894400,
+      "output_samples": 1925904,
+      "min_group_delta_ms": 99,
+      "max_group_delta_ms": 104,
+      "lookahead_groups": 1
+    },
+    "error": null
+  },
   "corrected_attended_trial": "pending",
   "live_session_active": false,
   "room_audio_recorded": false,
-  "room_transcripts_logged": false
+  "room_transcripts_logged": false,
+  "go_tests": {
+    "audio_tap": "passed",
+    "web_admin": "passed",
+    "intent_processing": "passed",
+    "host": "Pi; root toolchain cache and Vosk flags; GOMAXPROCS=2/-p1"
+  },
+  "repository": "https://github.com/jftesser/wire-pod",
+  "branch": "codex/vector-native-live",
+  "checkpoint_commit": "ada73a7",
+  "pi_reboot_idle_recovery": true,
+  "pi_reboot_paid_session_started": false,
+  "normal_session_max_seconds": 600,
+  "volume": 80
 }

@@ -17,7 +17,7 @@
     "gateway_race": "passed"
   },
   "deployed": true,
-  "active": false,
+  "active": true,
   "stage_exit": 0,
   "files": {
     "bin/vic-anim": {
@@ -58,5 +58,11 @@
   "running_candidate_proof": {
     "engine_library_inode": 43487,
     "mic_executable_sha256": "a9d62293398f91279bcb20cdcca279610081e86f0e9b3099c830a902edfb4200"
-  }
+  },
+  "persistent_application_overlay": true,
+  "persistent_unit": "vector-native-mic.service",
+  "automatic_rollback_timer": false,
+  "persistent_boot_hashes_and_loaded_binaries_verified": true,
+  "backend_host": "Pi",
+  "current_deployment": "../PI_MIGRATION.md"
 }

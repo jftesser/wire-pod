@@ -2,7 +2,7 @@
 
 ## Pi deployment
 
-Vector's companion and native echo processor are migrating to the Pi alongside
+Vector's companion and native echo processor are deployed on the Pi alongside
 wire-pod. The local controller uses a private Unix socket; the Mac SSH bridge is
 optional development tooling. The controller is enabled at boot but opens no
 mic, robot control or paid session until web-admin Start. See

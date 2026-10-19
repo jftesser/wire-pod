@@ -130,3 +130,54 @@ failures now report bounded internal diagnostics with no room speech content.
 The corrected two-minute silent reference test and attended result are recorded
 in `PI_MIGRATION_RESULT.json`; do not claim the voice quality fixed until that
 physical rehearsal succeeds.
+
+
+## Corrected silent stress result
+
+The two-minute native capture plus continuous synthetic render-reference test
+passed with the original one-second reference bound:1184source groups, zero
+group gaps,12,036processed10msframes and no worker error. Measured timestamp
+intervals were99–104ms. The upload clock's maximum late wake was11.64ms;
+maximum queued input was310ms. Only12of12,001upload frames needed silence
+padding, compared with85of3,745before the old adapter failed. Peak main/worker
+memory remained84,560/47,856KiB; main CPU was15.5%of one core. This validates
+clock alignment under the silent reference load, not acoustic echo suppression
+or perceived voice quality.
+
+To deploy updated companion source on this Pi, copy the top-level Python files,
+`pyproject.toml` and the controller unit into `/home/pi/vector-live-native`.
+Keep the key at its existing approved path. Install the isolated worker with:
+
+```sh
+python3 -m venv /home/pi/vector-native-audio
+/home/pi/vector-native-audio/bin/python -m pip install -r native-audio-requirements.txt
+sudo install -m644 vector-native-controller.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now vector-native-controller.service
+```
+
+Run companion tests from the source directory with
+`VECTOR_AUDIO_TEST_PYTHON=/home/pi/vector-native-audio/bin/python /home/pi/vector-live-app/.venv/bin/python -m pytest -q`.
+Test discovery is scoped to `tests` so the separate firmware vendor tree is not
+mistaken for companion tests. The legacy SDK environment's pinned packages are
+listed in `requirements.txt`; the modern worker pins are separate.
+
+
+## Boot and final service state
+
+The Pi was rebooted after installation. wire-pod and the native controller both
+returned, the private socket was available, and the admin reported legacy/off,
+continuous available, no active mic and no paid child. The initial90-second
+attended trial configuration was then replaced with the versioned service's
+normal600-second maximum at volume80. The unpaid controller was restarted and
+remains off until explicit Start. The original wake service is preserved.
+
+The wire-pod audiotap, config-ws and preqs Go packages passed tests using the
+existing root toolchain/cache and documented Vosk flags, with compilation
+limited to two scheduler threads and one build job. Pi source matches the fork;
+the single mismatch was comment wording and was synchronized without rebuilding
+or replacing the working Go executable. No new Go behavior was required for the
+Pi-local controller migration.
+
+Corrected audible voice quality and spoken exit remain an owner-present check;
+no additional audible test is started without a current readiness response.
