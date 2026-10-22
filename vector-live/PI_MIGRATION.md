@@ -459,14 +459,57 @@ inside a native Live session. Ordinary behavior and the microphone stream stay
 active; Stop or lease expiry restores voice wake-ups. See
 [firmware/CONTINUOUS_MIC.md](firmware/CONTINUOUS_MIC.md) for scope and recovery.
 
-Extra speech boost now offers 0, 3, 6, 9 and 12 dB in the admin. The saved setting
-is +9 dB, volume100, with every other setting preserved. This is +3 dB above the
-previous +6 dB setting; the existing soft peak limiter and post-gain AEC reference
-are unchanged. It is gain, not automatic loudness matching to the duck.
+Extra speech boost now offers 0, 3, 6, 9 and 12 dB in the admin. Deployment set +9 dB, volume100, with every other setting preserved. The owner
+then selected +12 dB and started a Live session in the admin. These settings add
++3 or +6 dB respectively above the previous +6 dB boost; the existing soft peak
+limiter and post-gain AEC reference are unchanged. It is gain, not automatic loudness matching to the duck.
 
 Validation:132 Python tests passed on the Pi, as did the Go admin, intent and
 microphone-tap packages. The ARM microphone build and C++ queue sanitizer tests
 passed. The admin shows the saved +9 dB and the new +12 dB option. Deployment
 backup: `/home/pi/vector-native-backups/20261022-before-wake-volume`.
-Attended volume balance, wake suppression and ordinary clock recovery are pending.
+The owner confirmed no legacy wake-word response during Live, but +12 dB was
+still too quiet. Inspection then found the robot master volume at1(Low); SDK
+SetMasterVolume set it to5(High), verified in the persisted robot settings.
+Live boost was reduced to+6 dB before raising the master volume. Attended volume
+balance with that combination and ordinary clock recovery remain pending.
 Live was left off after deployment and the quiet native microphone/APM check.
+
+After the quiet checks, an owner-started Live session was observed ready with
+native microphone active and +12 dB selected. It was left running for the
+attended audition under the existing bounded session duration.
+
+
+The owner clarified that Low master volume deliberately keeps chirps soft, and
+confirmed that High plus+6 dB still left speech too quiet. Master volume was
+restored to Low (persisted value1). Increasing global volume is not the solution.
+A separate native speech mixer trim is now installed: +12 dB on the TextToSpeech
+emitter's direct output to Victor_Listener only while a native SDK microphone
+lease is active at stream preparation. Completion, cancellation and error cleanup
+reset the multiplier to unity. Ordinary chirps and the saved master volume are
+not changed by this path. The Pi slider remains a separate live-adjustable gain
+and mute. Software boost is0 for the initial mixer audition. The ARM build and
+running binary hash were verified; attended loudness and distortion are pending.
+The existing AEC reference contains post-Pi PCM, before this robot mixer gain;
+AEC must adapt to that output gain as it already does to hardware master volume.
+Echo behavior at higher audible levels needs an attended check.
+
+After application restart the gateway initially retried a stale connected
+switchboard Unix datagram socket with EPERM and had no TLS listener. Restarting
+vic-switchboard and vic-cloud restored authenticated SDK access; the installer
+now includes switchboard in its stop/start dependency sequence. No network or
+credential changes were needed.
+
+The first mixer Live attempt finalized 47 paid seconds with 517 native groups,
+zero gaps, no worker/session error, but output was essentially silence
+(peak 51, RMS -90 dBFS) and zero speaker segments completed. The owner heard no
+answer; that attempt did not exercise mixer loudness. A subsequent owner restart
+was observed ready with one completed speaker segment. Audibility, balance and
+post-Stop clock recovery still await owner confirmation. No audio or conversation
+transcripts were recorded for these checks.
+
+The owner confirmed the restarted session was definitely louder with the native
+mixer trim, but wanted more level. Admin readback showed volume 100 and Extra
+boost 0, rather than both controls at maximum. Extra boost was raised to+6 dB
+without restarting Live; +9 and +12 remain available. The owner has not yet
+confirmed the final balance or post-Stop clock recovery.

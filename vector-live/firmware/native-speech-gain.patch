@@ -1,0 +1,58 @@
+--- a/animProcess/src/cozmoAnim/audio/sdkAudioComponent.h
++++ b/animProcess/src/cozmoAnim/audio/sdkAudioComponent.h
+@@ -66,6 +66,7 @@
+   // Private members
+   // -------------------------------------------------------------------------------------------------------------------
+ 
++  const Anim::AnimContext* _context = nullptr;
+   AudioController * _audioController = nullptr;
+   StreamingWaveDataPtr _waveData = nullptr;
+   uint16_t  _audioRate;
+--- a/animProcess/src/cozmoAnim/audio/sdkAudioComponent.cpp
++++ b/animProcess/src/cozmoAnim/audio/sdkAudioComponent.cpp
+@@ -21,6 +21,7 @@
+ #include "cozmoAnim/animProcessMessages.h"
+ #include "cozmoAnim/audio/cozmoAudioController.h"
+ #include "cozmoAnim/animContext.h"
++#include "cozmoAnim/micData/micDataSystem.h"
+ 
+ #include "util/logging/logging.h"
+ 
+@@ -48,6 +49,7 @@
+   DEV_ASSERT(nullptr != context, "SdkAudioComponent.InvalidContext");
+   DEV_ASSERT(nullptr != context->GetAudioController(), "SdkAudioComponent.InvalidAudioController");
+ 
++  _context = context;
+   _audioController = context->GetAudioController();
+   _audioPrepared = false;
+   _audioPosted = false;
+@@ -167,6 +169,19 @@
+   }
+   if (!ANKI_VERIFY(msg.audio_rate >= 8000 && msg.audio_rate <= 16025,
+                    "SdkAudioComponent::PrepareAudioEngine", "Invalid audio rate %u", msg.audio_rate)) {
++    return false;
++  }
++
++  // Native conversation speech has its own mixer trim, independent of chirps.
++  // Apply after PCM decoding so quiet speech can use the float mixer headroom.
++  // The Pi still controls volume/mute and supplies its bounded peak limiter.
++  // Ordinary SDK playback keeps unity gain. Reset on completion/cancel/error.
++  const bool nativeConversation = _context->GetMicDataSystem()->IsSDKMicActive();
++  constexpr float kNativeSpeechGain = 3.9810717f; // +12 dB
++  const auto emitter = static_cast<AudioEngine::AudioGameObject>(kSdkGameObject);
++  const auto listener = static_cast<AudioEngine::AudioGameObject>(AudioMetaData::GameObjectType::Victor_Listener);
++  if (!_audioController->SetGameObjectOutputBusVolume(emitter, listener,
++                                                    nativeConversation ? kNativeSpeechGain : 1.0f)) {
+     return false;
+   }
+ 
+@@ -285,6 +300,9 @@
+     _waveData->DoneProducingData();
+   }
+ 
++  _audioController->SetGameObjectOutputBusVolume(
++    static_cast<AudioEngine::AudioGameObject>(kSdkGameObject),
++    static_cast<AudioEngine::AudioGameObject>(AudioMetaData::GameObjectType::Victor_Listener), 1.0f);
+   _audioPrepared = false;
+   _audioPosted = false;
+   _waveData = NULL;

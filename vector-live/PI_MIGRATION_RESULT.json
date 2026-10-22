@@ -437,13 +437,45 @@
       9,
       12
     ],
-    "saved_boost_db": 9,
+    "saved_boost_db": 6,
     "saved_volume": 100,
     "other_settings_preserved": true,
     "limiter": "Existing soft peak limiter unchanged; AEC receives post-gain PCM",
     "browser_verified": true,
-    "attended_test": "pending owner readiness",
+    "attended_test": "Owner confirmed no legacy wake-word response during Live; +12 dB still too quiet.",
     "pi_backup": "/home/pi/vector-native-backups/20261022-before-wake-volume",
-    "live_off_after_deployment": true
+    "live_off_after_deployment": true,
+    "deployment_set_boost_db": 9,
+    "owner_started_session_after_deployment": true,
+    "owner_selected_boost_db": 12,
+    "current_live_state": "Owner-started session active; left running for attended audition.",
+    "master_volume_found": 1,
+    "master_volume_found_label": "Low",
+    "master_volume_set": 1,
+    "master_volume_set_label": "Low",
+    "master_volume_persisted_verified": true,
+    "volume_retest": "Extra boost raised to6 in the active session; awaiting owner balance report",
+    "master_volume_preference": "Low intentionally keeps chirps soft; restored after High audition also left voice quiet.",
+    "native_speech_mixer_gain_db": 12,
+    "mixer_first_live_attempt": {
+      "usage_seconds": 47,
+      "finalized": true,
+      "microphone_source_groups": 517,
+      "missing_source_groups": 0,
+      "output_rms_dbfs": -90,
+      "output_peak": 51,
+      "speaker_segments_completed": 0,
+      "worker_error": null,
+      "session_error": null,
+      "owner_report": "No answer",
+      "interpretation": "API delivered essentially silent output; mixer loudness not exercised"
+    },
+    "owner_restart_observed": {
+      "phase": "ready",
+      "speaker_segments_completed": 1,
+      "boost_db": 0,
+      "result": "awaiting owner audibility report"
+    },
+    "owner_mixer_report": "Definitely louder, could be louder still; volume100 but Extra boost was0."
   }
 }

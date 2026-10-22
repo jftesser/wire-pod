@@ -22,7 +22,7 @@
   "files": {
     "bin/vic-anim": {
       "bytes": 3666364,
-      "sha256": "727b1c6e22808b87ff2f22ce356b57787affc911ef0ca97fa0f5dcd6186c8b6a"
+      "sha256": "3081771cfbea6c1b8b306d60fdd5cdae70682b0ab1b79775811fbf39089ba567"
     },
     "bin/vic-engine": {
       "bytes": 255904,
@@ -85,6 +85,21 @@
       "audible_playback": false
     },
     "backup": "/data/vector-native-mic/backups/20261022-before-wake-guard",
-    "attended_wake_test": "pending owner readiness"
+    "attended_wake_test": "Owner confirmed no legacy wake-word response during Live.",
+    "post_stop_clock_test": "pending"
+  },
+  "native_speech_gain_20261022": {
+    "patch": "native-speech-gain.patch",
+    "patch_sha256": "762df9e42fc72237c2375d168053fed262e62413af27719b509997abb0052c10",
+    "apply_after": "native-wake-guard.patch",
+    "gain_db": 12,
+    "scope": "TextToSpeech emitter direct output to Victor_Listener during native SDK microphone lease; reset to unity on stream cleanup/completion/error",
+    "master_volume_preserved": "Low",
+    "running_binary_hash_verified": true,
+    "robot_services_active": true,
+    "root_read_only": true,
+    "arm_release_build": "passed",
+    "backup": "/data/vector-native-mic/backups/20261022-before-speech-gain",
+    "attended_result": "Owner confirms definitely louder after restart. Extra boost0 at that time, raised to6 for follow-up."
   }
 }

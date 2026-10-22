@@ -27,7 +27,23 @@ mount helper in `/data/vector-native-mic/backups/20261022-before-wake-guard`.
 The installed running microphone executable matches the new manifest hash; all
 three robot application services are active and root is read-only. A quiet
 native/APM probe passed with 103 source groups, zero gaps and no worker error.
-Attended wake suppression and post-Stop recovery are awaiting owner testing.
+The owner confirmed no legacy wake-word response during Live. Post-Stop ordinary
+clock recovery is awaiting owner testing.
+
+## Separate streamed-speech mixer trim (October 22)
+
+Apply `native-speech-gain.patch` after the wake guard. A +12 dB emitter/listener
+output gain applies to SDK playback prepared during a healthy native microphone
+lease. The Wwise API's installed header documents values greater than 1 as
+amplification; the wrapper forwards the float without clamping. Normal SDK
+playback uses unity. Completion/cancellation/error cleanup resets unity, keeping
+other TextToSpeech playback unaffected after the stream. Master volume remains
+Low at the owner's request to keep ordinary chirps soft. This is separate from
+the Pi's optional PCM boost and peak limiter, so audible distortion and echo
+handling require a physical audition. No claim of loudness matching is made yet.
+The ARM release binary built and its running hash was verified. The previous
+wake-guard binary and mount helper are backed up in
+`/data/vector-native-mic/backups/20261022-before-speech-gain`.
 
 ## Original experiment and evidence
 
