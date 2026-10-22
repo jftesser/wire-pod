@@ -1,5 +1,5 @@
 {
-  "updated_utc": "2026-10-19T23:28:58.465819+00:00",
+  "updated_utc": "2026-10-22T21:24:50.415221+00:00",
   "state": "Pi continuous voice with natural behavior and bounded requested motor actions",
   "backend_host": "Pi",
   "mac_audio_or_cloud_dependency": false,
@@ -395,5 +395,32 @@
     "audible_playback": false,
     "live_off_after_validation": true,
     "backup": "20261019-before-persona"
+  },
+  "venue_network_20261022": {
+    "ssid": "VectorTable",
+    "security": "WPA2-CCMP",
+    "band": "2.4 GHz",
+    "pi_ap_address": "192.168.77.1",
+    "vector_address": "192.168.77.232",
+    "pi_ethernet_address": "192.168.2.2",
+    "admin": "http://192.168.2.2:8080/vector-live.html",
+    "upstream": "Mac venue Wi-Fi via Ethernet Internet Sharing",
+    "mac_interface": "en14",
+    "mac_host_route_interface": "bridge100",
+    "openai_https_without_key": 401,
+    "sdk_authenticated": true,
+    "existing_ssh_identity_verified": true,
+    "native_overlay_active": true,
+    "firmware": "3.0.2.35d",
+    "vector_to_pi_http": 200,
+    "private_network_autoconnect": true,
+    "guest_profile_autoconnect": false,
+    "pairing_tokens_preserved": true,
+    "ordinary_clock_test": "awaiting owner confirmation",
+    "paid_live_test": false,
+    "live_left_off": true,
+    "guest_peer_filtering": "likely; router policy not inspected",
+    "pairing_backup": "/home/pi/vector-native-backups/20261022-before-private-network/botSdkInfo.json",
+    "mac_route_persistence": "temporary; recheck after restart or sharing changes"
   }
 }

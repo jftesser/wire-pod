@@ -1,6 +1,63 @@
 # Event setup: Vector and Goth Duck
 
-## Recommendation
+## Onsite network · October 22, 2026
+
+The venue setup now uses the Pi itself as Vector's private access point:
+
+`UUFCO Guest → Mac Wi-Fi → Internet Sharing / USB Ethernet → Pi → VectorTable Wi-Fi → Vector`
+
+- Mac Ethernet adapter: `en14`, shared through `bridge100`.
+- Pi Ethernet address: `192.168.2.2`; admin:
+  `http://192.168.2.2:8080/vector-live.html`.
+- Pi private Wi-Fi: **VectorTable**, WPA2-CCMP, 2.4 GHz channel1,
+  `192.168.77.1/24`. Vector currently has `192.168.77.232`.
+- NetworkManager profile `vector-table-private` autoconnects at priority100.
+  The venue-client profile `vector-event-uufco-guest` remains saved with
+  autoconnect disabled. Original home profiles are preserved.
+- The generated Wi-Fi password is stored privately on the Pi and in its
+  NetworkManager profile; no password or API key belongs in this document.
+
+Both devices joined UUFCO Guest, but Vector's SSH/SDK ports timed out from the
+Pi, including in a clean Wi-Fi-only test with Ethernet disconnected. They became
+reachable immediately on VectorTable. Guest peer filtering is the likely cause;
+the venue's router policy was not inspected.
+
+The venue and Mac Internet Sharing both use `192.168.2.0/24`. The owner applied
+this temporary host route so return traffic to the Pi uses Ethernet:
+
+```sh
+sudo route -n delete -host 192.168.2.2
+sudo route -n add -host 192.168.2.2 -interface bridge100
+```
+
+This route may need reapplying after a Mac restart or network/share changes.
+Verify the Pi's actual lease and bridge before reusing it. Stopping Sharing
+removed the Mac's Wi-Fi subnet route during the overlap test; renewing the
+Wi-Fi DHCP lease restored it. No administrator password was collected by the
+companion. Keep the Mac awake, online and connected to the Pi by Ethernet;
+the Mac need not join VectorTable. A distinct Ethernet sharing subnet would
+be a cleaner long-term setup; that preference was not changed onsite.
+
+Validation: Pi OpenAI HTTPS returned401 without credentials, confirming network
+reachability. Vector's existing SSH host key and developer key authenticated
+through the Pi; the native microphone overlay is active. Authenticated SDK
+status confirmed serial00a14a38, WireOS3.0.2.35d and the new private address.
+The stale home address in wire-pod's pairing metadata was updated without
+changing tokens. A private backup is at
+`/home/pi/vector-native-backups/20261022-before-private-network/botSdkInfo.json`.
+The admin is reachable with Live off; saved personality/sound/motion settings
+are preserved. No paid conversation was opened for these network checks.
+The ordinary clock and attended Live rehearsal remain separate checks.
+
+The Bluetooth setup site's non-EP warning checks whether the version string
+contains `ep`; it does not recognize WireOS. Its normal-mode path shows the
+warning and activation screen without starting an OTA. Wi-Fi was changed
+through its existing Bluetooth terminal (`wifi-scan`, `wifi-connect`,
+`wifi-ip`, `status`), then Bluetooth was disconnected. No recovery mode,
+activation, erasure or firmware replacement was performed. Reloading the
+setup page cleared its temporary command history after configuring Wi-Fi.
+
+## Pre-event recommendation
 
 Bring the **known-working Pi, Mac, Duck and a private 2.4 GHz router**. Rehearse on
 that same router before leaving; change only its Internet uplink at the venue.
@@ -16,7 +73,7 @@ flowchart LR
   Pi -- native mic and Live speaker stream --> Vector
 ```
 
-The Pi currently uses Ethernet; its Wi-Fi interface is disconnected. Its services,
+Before the onsite migration, the Pi used Ethernet with Wi-Fi disconnected. Its services,
 pairing, certificates and rollback already work. Duck uses USB for input/output
 and needs no additional Wi-Fi provisioning.
 
