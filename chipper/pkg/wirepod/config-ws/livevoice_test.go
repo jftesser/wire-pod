@@ -153,14 +153,14 @@ func TestLiveOptionsAreBoundedAndDoNotStartVoice(t *testing.T) {
 		forwarded++
 		return map[string]interface{}{"saved": true}, nil
 	}
-	for _, body := range []string{`{"boost_db":0}`, `{"boost_db":6,"expressions":"head"}`, `{"expressions":"off"}`} {
+	for _, body := range []string{`{"boost_db":0}`, `{"boost_db":6,"expressions":"head"}`, `{"boost_db":9}`, `{"boost_db":12}`, `{"expressions":"off"}`} {
 		w := httptest.NewRecorder()
 		handleLiveAdmin(w, controlRequest("POST", "options", body))
 		if w.Code != http.StatusOK {
 			t.Fatal(body, w.Code, w.Body.String())
 		}
 	}
-	for _, body := range []string{`{}`, `{"boost_db":9}`, `{"boost_db":true}`, `{"expressions":"roam"}`, `{"volume":100}`, `{"boost_db":6} {}`} {
+	for _, body := range []string{`{}`, `{"boost_db":15}`, `{"boost_db":true}`, `{"expressions":"roam"}`, `{"volume":100}`, `{"boost_db":6} {}`} {
 		w := httptest.NewRecorder()
 		handleLiveAdmin(w, controlRequest("POST", "options", body))
 		if w.Code != http.StatusBadRequest {
@@ -171,7 +171,7 @@ func TestLiveOptionsAreBoundedAndDoNotStartVoice(t *testing.T) {
 	r.Header.Set("Origin", "http://elsewhere.example")
 	w := httptest.NewRecorder()
 	handleLiveAdmin(w, r)
-	if w.Code != http.StatusForbidden || forwarded != 3 || len(*calls) != 0 {
+	if w.Code != http.StatusForbidden || forwarded != 5 || len(*calls) != 0 {
 		t.Fatal("options bypassed validation or started voice")
 	}
 }

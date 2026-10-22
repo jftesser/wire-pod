@@ -22,7 +22,7 @@
   "files": {
     "bin/vic-anim": {
       "bytes": 3666364,
-      "sha256": "a9d62293398f91279bcb20cdcca279610081e86f0e9b3099c830a902edfb4200"
+      "sha256": "727b1c6e22808b87ff2f22ce356b57787affc911ef0ca97fa0f5dcd6186c8b6a"
     },
     "bin/vic-engine": {
       "bytes": 255904,
@@ -64,5 +64,27 @@
   "automatic_rollback_timer": false,
   "persistent_boot_hashes_and_loaded_binaries_verified": true,
   "backend_host": "Pi",
-  "current_deployment": "../PI_MIGRATION.md"
+  "current_deployment": "../PI_MIGRATION.md",
+  "wake_guard_20261022": {
+    "patch": "native-wake-guard.patch",
+    "patch_sha256": "f73528e3d708921a8ef246be9f73c9c673b75c4eb0735dde1d038968916c56ec",
+    "apply_after": "continuous-mic.patch",
+    "scope": "Voice trigger callback suppressed while native SDK microphone lease is active; button and PCM capture preserved",
+    "release": "Explicit stream stop or three-second lease expiry",
+    "cross_build": "ARM Release vic-anim passed",
+    "queue_asan_ubsan": "passed",
+    "installed": true,
+    "running_process_hash_verified": true,
+    "root_read_only": true,
+    "quiet_native_apm_probe": {
+      "source_groups": 103,
+      "source_group_gaps": 0,
+      "wall_seconds": 12.29,
+      "worker_error": null,
+      "paid_api": false,
+      "audible_playback": false
+    },
+    "backup": "/data/vector-native-mic/backups/20261022-before-wake-guard",
+    "attended_wake_test": "pending owner readiness"
+  }
 }

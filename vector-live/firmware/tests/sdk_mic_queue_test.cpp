@@ -8,8 +8,10 @@ int main() {
   std::array<int16_t, 160> pcm{};
   pcm[0] = -32768; pcm[159] = 32767;
   queue.Push(pcm.data(), pcm.size(), 10, start);
+  assert(!queue.IsActive(start)); // Wake word remains available without a stream.
   assert(queue.Drain(start).empty()); // Opt-in only.
   queue.Renew(1, true, start);
+  assert(queue.IsActive(start));
   for (unsigned i = 0; i < 10; ++i) queue.Push(pcm.data(), pcm.size(), i*10, start);
   auto blocks = queue.Drain(start);
   assert(blocks.size() == 10);
@@ -23,10 +25,13 @@ int main() {
   assert(queue.Drain(start + std::chrono::seconds(2))[0].sequence == 10);
   queue.Push(pcm.data(), pcm.size(), 110, start + std::chrono::seconds(2));
   queue.Renew(1, false, start + std::chrono::seconds(2));
+  assert(!queue.IsActive(start + std::chrono::seconds(2))); // Graceful stop unlocks immediately.
   assert(queue.Drain(start + std::chrono::seconds(2)).empty());
   // Expiration fails closed, even if a late heartbeat arrives.
   queue.Renew(2, true, start);
   queue.Push(pcm.data(), pcm.size(), 20, start);
+  assert(queue.IsActive(start + std::chrono::milliseconds(2999)));
+  assert(!queue.IsActive(start + std::chrono::seconds(3))); // Crash cannot leave wake word locked.
   assert(queue.Drain(start + std::chrono::seconds(3)).empty());
   queue.Renew(2, true, start + std::chrono::seconds(4));
   queue.Push(pcm.data(), pcm.size(), 30, start + std::chrono::seconds(4));
@@ -34,6 +39,7 @@ int main() {
   // Overflow does not grow memory or silently splice audio after a missing block.
   queue.Renew(3, true, start);
   for (unsigned i = 0; i <= SDKMicQueue::kMaxBlocks; ++i) queue.Push(pcm.data(), pcm.size(), i*10, start);
+  assert(!queue.IsActive(start));
   assert(queue.Drain(start).empty());
   queue.Renew(3, true, start);
   queue.Push(pcm.data(), pcm.size(), 0, start);
@@ -53,6 +59,7 @@ int main() {
   // A fresh owner can recover after an expired old lease without waiting for drain.
   queue.Renew(6, true, start);
   queue.Renew(7, true, start + std::chrono::seconds(4));
+  assert(queue.IsActive(start + std::chrono::seconds(4)));
   queue.Push(pcm.data(), pcm.size(), 0, start + std::chrono::seconds(4));
   assert(queue.Drain(start + std::chrono::seconds(4)).size() == 1);
   std::cout << "SDK mic queue: opt-in, FIFO, renewal, stop, expiry, overflow, restart passed\n";

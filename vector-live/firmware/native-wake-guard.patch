@@ -1,0 +1,43 @@
+--- a/lib/micData/sdkMicQueue.h
++++ b/lib/micData/sdkMicQueue.h
+@@ -19,6 +19,11 @@
+     uint32_t sequence;
+   };
+   static constexpr size_t kMaxBlocks = 50; // At most 500 ms / 16 KB of PCM.
++  // The voice trigger lock follows the same bounded lease as microphone capture.
++  bool IsActive(Clock::time_point now = Clock::now()) {
++    std::lock_guard<std::mutex> lock(_mutex);
++    return Check(now);
++  }
+   void Renew(uint32_t session, bool enabled, Clock::time_point now = Clock::now()) {
+     std::lock_guard<std::mutex> lock(_mutex);
+     if (!enabled) { _enabled = false; _blocks.clear(); return; }
+--- a/animProcess/src/cozmoAnim/micData/micDataSystem.h
++++ b/animProcess/src/cozmoAnim/micData/micDataSystem.h
+@@ -90,6 +90,7 @@
+   void SetSDKMicRequest(uint32_t session, bool enabled) {
+     _sdkMicQueue.Renew(session, enabled && !_micMuted);
+   }
++  bool IsSDKMicActive() { return _sdkMicQueue.IsActive(); }
+   void CollectSDKMicAudio(const int16_t* samples, size_t count, uint32_t timestamp) {
+     _sdkMicQueue.Push(samples, count, timestamp);
+   }
+--- a/animProcess/src/cozmoAnim/micData/micDataProcessor.cpp
++++ b/animProcess/src/cozmoAnim/micData/micDataProcessor.cpp
+@@ -183,8 +183,14 @@
+ }
+   
+ void MicDataProcessor::TriggerWordDetectCallback(TriggerWordDetectSource source,
+-                                                 const AudioUtil::SpeechRecognizerCallbackInfo& info)
+-{
++                                                const AudioUtil::SpeechRecognizerCallbackInfo& info)
++{
++  // Live owns voice input while its native microphone lease is healthy. Drop
++  // voice wake-ups before creating a legacy job, earcon or engine reaction.
++  // Keep backpack-button handling and continuous microphone PCM unchanged.
++  if (source == TriggerWordDetectSource::Voice && _micDataSystem->IsSDKMicActive()) {
++    return;
++  }
+   ShowAudioStreamStateManager* showStreamState = _context->GetShowAudioStreamStateManager();
+   // Ignore extra triggers during streaming
+   if (_micDataSystem->HasStreamingJob() || !showStreamState->HasValidTriggerResponse())

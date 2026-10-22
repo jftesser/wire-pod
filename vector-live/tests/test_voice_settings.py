@@ -40,6 +40,9 @@ def test_options_migrate_old_settings_and_volume_updates_preserve_them(tmp_path)
     save_settings(path,dict(boost_db=6,expressions='head'))
     save_volume(path,90)
     assert read_settings(path)==dict(volume=90,boost_db=6,expressions='head',nod_depth=8,nod_interval=12,legacy_animations=False,autonomy=False,motion='off',personality=DEFAULT_PERSONALITY,table_context=DEFAULT_TABLE_CONTEXT)
+    for boost in (9,12):
+        save_settings(path,{'boost_db':boost})
+        assert read_settings(path)['boost_db']==boost
     for changes in ({'boost_db':7},{'boost_db':True},{'expressions':'roam'},{'command':'x'},{'autonomy':1},{'motion':'roam'}):
         with pytest.raises(ValueError):save_settings(path,changes)
     assert read_settings(path)['volume']==90

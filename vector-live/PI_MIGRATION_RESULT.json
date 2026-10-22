@@ -421,6 +421,29 @@
     "live_left_off": true,
     "guest_peer_filtering": "likely; router policy not inspected",
     "pairing_backup": "/home/pi/vector-native-backups/20261022-before-private-network/botSdkInfo.json",
-    "mac_route_persistence": "temporary; recheck after restart or sharing changes"
+    "mac_route_persistence": "temporary; recheck after restart or sharing changes",
+    "owner_live_report": "Owner reports Vector is running and Live voice works on the private venue network."
+  },
+  "wake_guard_volume_20261022": {
+    "firmware_guard_deployed": true,
+    "python_tests_pi": 132,
+    "go_admin_intent_audio_tests": "passed",
+    "queue_asan_ubsan": "passed",
+    "arm_cross_build": "passed",
+    "boost_options_db": [
+      0,
+      3,
+      6,
+      9,
+      12
+    ],
+    "saved_boost_db": 9,
+    "saved_volume": 100,
+    "other_settings_preserved": true,
+    "limiter": "Existing soft peak limiter unchanged; AEC receives post-gain PCM",
+    "browser_verified": true,
+    "attended_test": "pending owner readiness",
+    "pi_backup": "/home/pi/vector-native-backups/20261022-before-wake-volume",
+    "live_off_after_deployment": true
   }
 }

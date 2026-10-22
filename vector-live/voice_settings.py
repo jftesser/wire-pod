@@ -5,6 +5,8 @@ from pathlib import Path
 import tempfile
 from persona import DEFAULT_PERSONALITY, DEFAULT_TABLE_CONTEXT, validate_profile_text
 
+BOOST_LEVELS = (0, 3, 6, 9, 12)
+
 
 def validate_volume(value):
     if type(value) is not int or not 0 <= value <= 100:
@@ -17,8 +19,8 @@ def validate_options(settings):
         raise ValueError('Voice settings are invalid.')
     if 'volume' in settings:
         validate_volume(settings['volume'])
-    if 'boost_db' in settings and (type(settings['boost_db']) is not int or settings['boost_db'] not in (0, 3, 6)):
-        raise ValueError('Boost must be 0, 3 or 6 dB.')
+    if 'boost_db' in settings and (type(settings['boost_db']) is not int or settings['boost_db'] not in BOOST_LEVELS):
+        raise ValueError('Boost must be 0, 3, 6, 9 or 12 dB.')
     if 'expressions' in settings and settings['expressions'] not in ('off', 'eyes', 'head'):
         raise ValueError('Expressions must be off, eyes or head.')
     for key, low, high in (('nod_depth', 2, 20), ('nod_interval', 4, 30)):

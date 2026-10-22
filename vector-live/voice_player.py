@@ -9,7 +9,7 @@ import math
 import struct
 import numpy as np
 from collections import deque
-from voice_settings import validate_volume
+from voice_settings import validate_volume, BOOST_LEVELS
 
 
 def volume_pcm(pcm, volume):
@@ -29,7 +29,7 @@ def boosted_pcm(pcm, volume, boost_db=0):
     ordinary speech below the knee keeps the full requested gain. This is a
     peak limiter, not loudness normalization or an automatic gain controller.
     """
-    if boost_db not in (0, 3, 6):
+    if boost_db not in BOOST_LEVELS:
         raise ValueError('Invalid boost.')
     if not boost_db or not volume:
         return volume_pcm(pcm, volume)

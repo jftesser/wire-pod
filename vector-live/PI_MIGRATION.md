@@ -448,3 +448,25 @@ Backup: `/home/pi/vector-native-backups/20261019-before-persona`.
 
 Browser verification confirmed drafts survive status polling and explicit Save
 persists the full Unicode/multiline profile across reload. Live remains off.
+
+
+## Conference wake-word suppression and louder speech (October 22)
+
+The robot's native microphone process now suppresses voice wake-word reactions
+while its SDK capture lease is healthy. This prevents a spoken “Hey Vector,”
+including one from the duck, from opening the separate legacy listening flow
+inside a native Live session. Ordinary behavior and the microphone stream stay
+active; Stop or lease expiry restores voice wake-ups. See
+[firmware/CONTINUOUS_MIC.md](firmware/CONTINUOUS_MIC.md) for scope and recovery.
+
+Extra speech boost now offers 0, 3, 6, 9 and 12 dB in the admin. The saved setting
+is +9 dB, volume100, with every other setting preserved. This is +3 dB above the
+previous +6 dB setting; the existing soft peak limiter and post-gain AEC reference
+are unchanged. It is gain, not automatic loudness matching to the duck.
+
+Validation:132 Python tests passed on the Pi, as did the Go admin, intent and
+microphone-tap packages. The ARM microphone build and C++ queue sanitizer tests
+passed. The admin shows the saved +9 dB and the new +12 dB option. Deployment
+backup: `/home/pi/vector-native-backups/20261022-before-wake-volume`.
+Attended volume balance, wake suppression and ordinary clock recovery are pending.
+Live was left off after deployment and the quiet native microphone/APM check.

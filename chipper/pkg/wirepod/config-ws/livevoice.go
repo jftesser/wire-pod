@@ -174,7 +174,7 @@ func handleLiveAdmin(w http.ResponseWriter, r *http.Request) {
 			(body.Personality != nil && (strings.TrimSpace(*body.Personality) == "" || utf8.RuneCountInString(*body.Personality) > 2000 || strings.ContainsRune(*body.Personality, 0))) ||
 			(body.TableContext != nil && (utf8.RuneCountInString(*body.TableContext) > 2000 || strings.ContainsRune(*body.TableContext, 0))) ||
 			(body.Motion != nil && *body.Motion != "off" && *body.Motion != "arms" && *body.Motion != "full") ||
-			(body.Boost != nil && *body.Boost != 0 && *body.Boost != 3 && *body.Boost != 6) ||
+			(body.Boost != nil && *body.Boost != 0 && *body.Boost != 3 && *body.Boost != 6 && *body.Boost != 9 && *body.Boost != 12) ||
 			(body.Expressions != nil && *body.Expressions != "off" && *body.Expressions != "eyes" && *body.Expressions != "head") ||
 			(body.NodDepth != nil && (*body.NodDepth < 2 || *body.NodDepth > 20)) ||
 			(body.NodInterval != nil && (*body.NodInterval < 4 || *body.NodInterval > 30)) || decoder.Decode(&struct{}{}) != io.EOF {

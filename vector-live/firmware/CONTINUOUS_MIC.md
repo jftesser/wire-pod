@@ -9,6 +9,26 @@ disable this service, restore root read-only and reboot. Do not unmount the
 application underneath running robot services. The Pi owns continuous input,
 WebRTC processing and Live sessions; see [../PI_MIGRATION.md](../PI_MIGRATION.md).
 
+## Voice wake-word guard (October 22)
+
+Apply `native-wake-guard.patch` after `continuous-mic.patch`. The voice trigger
+callback checks the SDK microphone queue's existing bounded lease before making
+any legacy listening job, earcon or engine reaction. Capture still delivers PCM;
+backpack-button triggers and ordinary autonomous behavior are preserved. This
+also suppresses voice wake-ups during a native offline microphone probe. It does
+not affect the optional host-microphone path. Live may still hear or answer the
+duck as conversational input; this guard prevents the separate legacy wake-up.
+
+Explicit stream Stop releases the guard. If the client or gateway fails, the
+three-second lease expires and voice wake-ups return. Queue tests cover active,
+Stop, expiry, overflow and new ownership under ASAN/UBSAN. The ARM release build
+passed. `install-wake-guard.sh` preserves the previous microphone binary and
+mount helper in `/data/vector-native-mic/backups/20261022-before-wake-guard`.
+The installed running microphone executable matches the new manifest hash; all
+three robot application services are active and root is read-only. A quiet
+native/APM probe passed with 103 source groups, zero gaps and no worker error.
+Attended wake suppression and post-Stop recovery are awaiting owner testing.
+
 ## Original experiment and evidence
 
 Source: os-vector/wire-os-victor at 8fc055ac5c7538601a319149fb62275207719140,

@@ -26,7 +26,7 @@ def test_continuous_silence_never_claims_robot_speaker():
     asyncio.run(check())
 
 
-@pytest.mark.parametrize('boost_db',[0,6])
+@pytest.mark.parametrize('boost_db',[0,6,9,12])
 def test_volume_can_mute_and_change_inside_one_active_stream_with_render_reference(boost_db):
     async def check():
         pcm=struct.pack('<4h',-32768,-1000,1000,32767)*400
@@ -85,13 +85,15 @@ def test_shutdown_during_capture_cannot_swallow_cancellation():
     asyncio.run(check())
 
 
-def test_boost_has_linear_headroom_soft_ceiling_and_exact_mute():
+@pytest.mark.parametrize('boost_db',[3,6,9,12])
+def test_boost_has_linear_headroom_soft_ceiling_and_exact_mute(boost_db):
     import numpy as np
     from voice_player import boosted_pcm
     samples=np.array([-32768,-20000,-1000,0,1000,20000,32767],dtype='<i2')
-    boosted=np.frombuffer(boosted_pcm(samples.tobytes(),100,6),dtype='<i2')
-    assert boosted[2]==-1995 and boosted[4]==1995
+    boosted=np.frombuffer(boosted_pcm(samples.tobytes(),100,boost_db),dtype='<i2')
+    expected=int(1000*10**(boost_db/20))
+    assert boosted[2]==-expected and boosted[4]==expected
     assert np.max(np.abs(boosted.astype(int)))<=29204
-    assert np.all(np.diff(boosted.astype(int))>0)
-    assert boosted_pcm(samples.tobytes(),0,6)==bytes(samples.nbytes)
+    assert np.all(np.diff(boosted.astype(int))>=0)
+    assert boosted_pcm(samples.tobytes(),0,boost_db)==bytes(samples.nbytes)
     assert boosted_pcm(samples.tobytes(),100,0)==samples.tobytes()
