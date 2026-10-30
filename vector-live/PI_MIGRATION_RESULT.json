@@ -477,5 +477,28 @@
       "result": "awaiting owner audibility report"
     },
     "owner_mixer_report": "Definitely louder, could be louder still; volume100 but Extra boost was0."
+  },
+  "home_36d_restoration": {
+    "date": "2026-10-30",
+    "pi": "10.0.0.212",
+    "vector": "10.0.0.91",
+    "robot_network": "home Wi-Fi",
+    "pi_uplink": "home router Ethernet",
+    "manifest": "firmware/CONTINUOUS_36D_MANIFEST.json",
+    "exact_stock_revision": "ebf38c28",
+    "compatibility": 209,
+    "restored_features": [
+      "native continuous microphones",
+      "voice wake guard during native stream",
+      "independent streamed-speech mixer trim",
+      "quiet expression assets"
+    ],
+    "boot_persistence_verified": true,
+    "live_left_off": true,
+    "operator_settings_preserved": true,
+    "paid_api": false,
+    "room_audio_recorded": false,
+    "ordinary_clock_check": "awaiting owner confirmation",
+    "firmware_update_policy": "unchanged; awaiting owner preference"
   }
 }

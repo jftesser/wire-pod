@@ -1,0 +1,102 @@
+{
+  "base_os": "3.0.2.36d",
+  "compatibility": 209,
+  "upstream_revision": "ebf38c2871a0a69b3ac1a6fd592bb597b8e57724",
+  "custom_revision": "783c622d65da7964e9b45b449dbb04b33a43325c",
+  "patch_sha256": "544da02fbaaae4fc921a0315277155787f25ce79fc3179e81668489bdde80163",
+  "files": {
+    "bin/vic-anim": {
+      "sha256": "6a538cd69e15f65cdb0de1bc133b50be46b793975ad4a25e1426cca30aa3edd4",
+      "bytes": 3666380
+    },
+    "bin/vic-engine": {
+      "sha256": "118586cf91fb1ccf29dea98ae46fbf77f1c9d24c9d5d760555d235ee0b730a82",
+      "bytes": 255904
+    },
+    "bin/vic-cloud": {
+      "sha256": "235cde091c9489ac88bb478185e7641deb173a97ecc9717b3c23125ed4dd90b4",
+      "bytes": 4633252
+    },
+    "lib/libcozmo_engine.so": {
+      "sha256": "27c5dd20b0354d55dc9595799ba635562fcc663f10437f43fcd011597591d7cd",
+      "bytes": 17522876
+    },
+    "lib/libaudio_engine.so": {
+      "sha256": "9766de81e83b927215c0cf326373d4eafdce470a68b58cfb43e722d1cf8196c8",
+      "bytes": 2848612
+    },
+    "lib/libvictor_web_library.so": {
+      "sha256": "4ade5719183212ca204b82dfd2241f5ecf45aa643b1583d4f5f4f4f1914c8bf4",
+      "bytes": 272400
+    },
+    "lib/libwhiskeyToF.so": {
+      "sha256": "cc94996e87eb485409429a6da11975033c6f58175b76d1e6b896338503b4cc5c",
+      "bytes": 161640
+    },
+    "lib/libcameraService.so": {
+      "sha256": "084f60c3559a894b81acef91158e5486cfee2d053097361384df43318caf4722",
+      "bytes": 231452
+    },
+    "lib/libcubeBleClient.so": {
+      "sha256": "c48ccb5dd5295e99ac296508525e2fdab330f7d5a2bb900c8e29c5ea0cc33a82",
+      "bytes": 1100396
+    }
+  },
+  "queue_asan_ubsan": "passed",
+  "gateway_race_tests": "passed (-vet=off for pre-existing upstream printf errors)",
+  "arm_build": "passed",
+  "deployed": true,
+  "active": true,
+  "application_path": "/data/vector-native-mic/application-36d",
+  "root_read_only": true,
+  "application_view_read_only": true,
+  "live_session_opened": false,
+  "running_mic_sha256_verified": true,
+  "mapped_engine_library_inode_verified": true,
+  "mapped_audio_library_inode_verified": true,
+  "settings_digest_preserved": true,
+  "validation": {
+    "continuous_native_apm": {
+      "source_groups": 446,
+      "source_wall_seconds": 45.355,
+      "missing_source_groups": 0,
+      "max_queue_ms": 330,
+      "max_upload_lateness_ms": 9.89,
+      "worker_error": null,
+      "error": null
+    },
+    "abrupt_client_exit_reconnect": {
+      "frames": 25,
+      "first_group": 0,
+      "missing_source_groups": 0
+    },
+    "fresh_followup_capture": {
+      "source_groups": 54,
+      "missing_source_groups": 0,
+      "worker_error": null
+    },
+    "paid_api": false,
+    "audible_playback": false,
+    "room_audio_recorded": false,
+    "boot_persistence": {
+      "passed": true,
+      "new_boot_id": "424553b2-456f-4114-8efd-06da35ee0fbe",
+      "service_enabled": true,
+      "service_active": true,
+      "running_mic_hash_verified": true,
+      "source_groups": 104,
+      "missing_source_groups": 0,
+      "worker_error": null,
+      "root_read_only": true,
+      "application_view_read_only": true
+    }
+  },
+  "staging_note": "Dynamic loaders passed for vic-anim and vic-engine. The gateway is statically linked; direct dynamic-loader inspection of that file was corrected after a staging-only loader crash. The stock running application was untouched during staging.",
+  "final_state": {
+    "live": "off",
+    "microphone_active": false,
+    "ordinary_robot_services": "active",
+    "firmware_update_policy": "unchanged; awaiting owner preference",
+    "ordinary_clock_check": "awaiting owner confirmation"
+  }
+}

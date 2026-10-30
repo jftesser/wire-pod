@@ -17,7 +17,7 @@
     "gateway_race": "passed"
   },
   "deployed": true,
-  "active": true,
+  "active": false,
   "stage_exit": 0,
   "files": {
     "bin/vic-anim": {
@@ -101,5 +101,7 @@
     "arm_release_build": "passed",
     "backup": "/data/vector-native-mic/backups/20261022-before-speech-gain",
     "attended_result": "Owner confirms definitely louder after restart. Extra boost0 at that time, raised to6 for follow-up."
-  }
+  },
+  "superseded_by": "CONTINUOUS_36D_MANIFEST.json",
+  "superseded_reason": "Stock 36d replaced the old rootfs application. The same custom features are now rebuilt on exact 36d source and stored in the data partition."
 }

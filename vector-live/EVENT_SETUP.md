@@ -1,5 +1,18 @@
 # Event setup: Vector and Goth Duck
 
+## Home setup · October 30, 2026
+
+The Pi uses home-router Ethernet at `10.0.0.212`; Vector is on home Wi-Fi at
+`10.0.0.91`. Open `http://10.0.0.212:8080/` for ordinary wire-pod, or
+`http://10.0.0.212:8080/vector-live.html` when continuous mode is wanted.
+The Mac stays on home Wi-Fi. Internet Sharing and the venue host route are
+unnecessary here. The private VectorTable network remains saved and available.
+
+Continuous microphone support was rebuilt for the installed WireOS 36d and
+verified across reboot. Live stays off until an explicit Start. Details and
+future-firmware limitations are in `PI_MIGRATION.md` and
+`firmware/CONTINUOUS_36D_MANIFEST.json`.
+
 ## Onsite network · October 22, 2026
 
 The venue setup now uses the Pi itself as Vector's private access point:

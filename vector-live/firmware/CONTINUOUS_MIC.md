@@ -1,5 +1,11 @@
 # Native continuous microphone application
 
+Current release: WireOS 36d, compatibility 209, rebuilt from exact revision
+`ebf38c28`. See [CONTINUOUS_36D_MANIFEST.json](CONTINUOUS_36D_MANIFEST.json).
+The active application is stored in `/data/vector-native-mic/application-36d`;
+its boot unit and fresh microphone capture have passed a reboot check. The
+35d experiment and deployment notes below are historical evidence.
+
 
 Current deployment: `vector-native-mic.service` verifies the pinned candidate
 hashes and bind-mounts it before robot application services on each boot. The

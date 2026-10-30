@@ -513,3 +513,58 @@ mixer trim, but wanted more level. Admin readback showed volume 100 and Extra
 boost 0, rather than both controls at maximum. Extra boost was raised to+6 dB
 without restarting Live; +9 and +12 remain available. The owner has not yet
 confirmed the final balance or post-Stop clock recovery.
+
+
+## Home restoration on WireOS 36d (October 30)
+
+At home the Pi uses router Ethernet at 10.0.0.212 and Vector has rejoined home
+Wi-Fi at 10.0.0.91. The Mac is an ordinary home Wi-Fi client; Internet Sharing
+and the venue-only 192.168.2.2 host route are unnecessary. The Pi's VectorTable
+access point remains available as a separate saved path.
+
+The robot now has WireOS 3.0.2.36d, application revision ebf38c28 and compatibility 209.
+The prior stock firmware replacement removed the custom /anki candidate and
+systemd unit, leaving data-partition helpers and backups. The stock SDK returned
+four identical non-silent groups; preflight rejected that test waveform before
+opening any paid session. Ordinary SDK status still worked.
+
+The exact upstream revision was used to port the bounded native microphone,
+voice-only wake guard and independent streamed-speech mixer trim. The upstream
+36d speaker-audibility/ReactToSound changes were retained. The local source
+branches preserve both the 35d and 36d builds; the complete reproducible patch is
+firmware/native-continuous-36d.patch. Nine rebuilt executables/libraries and the
+quiet expression assets are overlaid onto a copy of the current stock 36d app.
+The application copy now lives at /data/vector-native-mic/application-36d,
+so an OTA does not delete the only staged application. Its mount view and root
+are read-only. Exact version, compatibility and stock/custom hashes are checked;
+unsupported future firmware falls back to stock rather than mounting mismatched
+application binaries. A rootfs OTA can still remove the boot unit, so preserving
+the data copy alone does not make arbitrary future updates compatible.
+
+Validation so far: ARM build passed; C++ queue tests passed under ASAN/UBSAN;
+gateway ownership/cancellation/frame checks passed with Go race detection.
+Go vet was disabled for pre-existing upstream printf-format errors. Both dynamic
+C++ executables passed target loader checks; the Go gateway is statically linked
+and is checked by checksum and actual startup instead. A staging-only attempt to
+inspect it with ld.so was corrected before application activation.
+
+Authenticated SDK status and running microphone hash passed. Engine and audio
+library mapped inodes match the new candidate. A 45-second native/APM probe yielded
+446 source groups, zero gaps and no worker error. Abrupt client exit released the
+stream; a new capture started at group 0 and a further 5-second capture passed.
+No room audio or transcripts were recorded; no paid API session or model playback
+was opened. Operator settings match their saved pre-install digest. Boot
+persistence and final state are recorded in firmware/CONTINUOUS_36D_MANIFEST.json.
+
+A normal reboot then loaded the overlay automatically: boot ID changed, the
+persistent unit was enabled/active, the running microphone hash matched the
+36d manifest, and another 104 source groups arrived with zero gaps. Root and
+application mount views remained read-only. Live and microphone capture were
+off at the end, with the idle Pi controller healthy. No paid Live conversation
+was opened. The owner's ordinary clock check is still pending.
+
+The existing firmware-update policy is unchanged pending the owner's preference.
+The updater's random pre-check sleep was paused only for activation/reboot;
+after reboot the normal update timer was active again. Future stock rootfs
+updates can remove the boot unit and require a version-compatible repair. The
+saved data copy, hash manifests and restore/recovery helpers remain available.
